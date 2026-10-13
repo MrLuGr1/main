@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "id": "d2a8add6-04da-43f0-a61a-b9961e5afcc9",
+    "name": "Instagram profil",
+    "description": "",
+    "url": "https://www.instagram.com/mr.lugr_art/",
+    "category": "web",
+    "favorite": false
+  }
+]
