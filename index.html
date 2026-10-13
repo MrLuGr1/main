@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#e9edf2">
+  <!-- After deploying admin-worker.js, set this to its public HTTPS URL. Never put credentials here. -->
+  <meta name="pixel-desk-api" content="">
   <script>try{if(localStorage.getItem('pixel-desk-theme-v1')==='dark')document.documentElement.dataset.theme='dark'}catch{}</script>
   <title>Pixel Desk — rozcestník projektů</title>
   <link rel="stylesheet" href="style.css">
@@ -78,7 +80,7 @@
   <dialog class="project-dialog admin-dialog" id="admin-dialog" aria-labelledby="admin-title">
     <form id="admin-login-form">
       <div class="dialog-titlebar"><span class="dialog-folder" aria-hidden="true">▣</span><span id="admin-title">Přihlášení správce</span><button class="dialog-x" id="close-admin-dialog" type="button" aria-label="Zavřít">×</button></div>
-      <div class="dialog-body"><p class="dialog-intro">Přihlášení odemkne přidávání a mazání projektů v tomto prohlížeči.</p><p class="admin-security-note">Lokální UI zámek není náhradou serverového ověřování a lze jej obejít přes vývojářské nástroje.</p>
+      <div class="dialog-body"><p class="dialog-intro">Přihlášení ověřuje zabezpečené API. Heslo ani přístupový token se neukládají do repozitáře.</p><p class="admin-security-note">Administrace vyžaduje nasazené API. Tajné údaje patří do serverových Secrets, nikdy do HTML nebo JavaScriptu.</p>
         <label class="field-label" for="admin-password">HESLO SPRÁVCE</label><input class="field-input" id="admin-password" name="password" type="password" autocomplete="current-password" required>
         <p class="admin-login-status" id="admin-login-status" role="alert" aria-live="polite"></p>
       </div>
@@ -95,3 +97,4 @@
 
 </body>
 </html>
+
