@@ -43,13 +43,13 @@ Wrangler prints a URL similar to `https://pixel-desk-admin.<account-subdomain>.w
 
 ## 4. Connect GitHub Pages to the API
 
-Put the Worker URL (without a trailing slash) into the `pixel-desk-api` meta tag in `index.html`:
+The deployed Worker URL for this project is `https://pixel-desk-admin.mrlugr1.workers.dev`. It is already set in the `pixel-desk-api` meta tag in `index.html`:
 
 ```html
-<meta name="pixel-desk-api" content="https://pixel-desk-admin.YOUR-SUBDOMAIN.workers.dev">
+<meta name="pixel-desk-api" content="https://pixel-desk-admin.mrlugr1.workers.dev">
 ```
 
-Commit that public URL change to `main`. It is configuration, not a credential. The Pages site can then load shared projects and use Admin Login. A successful login receives a signed, 30-minute token held only in page memory; reloading the page signs the admin out. Add and remove actions are checked by the Worker and committed to `projects.json` in this repository.
+The public URL is configuration, not a credential. The Pages site can load shared projects and use Admin Login. A successful login receives a signed, 30-minute token held only in page memory; reloading the page signs the admin out. Add and remove actions are checked by the Worker and committed to `projects.json` in this repository.
 
 ## Security notes
 
