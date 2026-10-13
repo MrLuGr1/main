@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e9edf2">
+  <script>try{if(localStorage.getItem('pixel-desk-theme-v1')==='dark')document.documentElement.dataset.theme='dark'}catch{}</script>
+  <title>Pixel Desk — rozcestník projektů</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <canvas id="pixel-trail" aria-hidden="true"></canvas>
+  <main class="desktop">
+    <header class="topbar">
+      <a class="brand" href="#home" aria-label="Pixel Desk, domů">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span>PIXEL<span class="brand-light">_DESK</span></span>
+      </a>
+      <div class="topbar-right"><span class="status-dot"></span><span>MOJE PROJEKTY</span><span class="topbar-divider"></span><span id="clock">--:--</span><button class="theme-toggle" id="theme-toggle" type="button" aria-label="Přepnout na tmavý režim" title="Přepnout režim"><span class="theme-icon" aria-hidden="true">◐</span><span id="theme-label">TMAVÝ REŽIM</span></button></div>
+    </header>
+
+    <section class="window" id="home" aria-label="Správce projektů">
+      <div class="window-titlebar">
+        <div class="window-title"><span class="tiny-folder" aria-hidden="true"></span><span>Pracovní plocha <span class="title-path">/ Projekty</span></span></div>
+        <div class="window-controls" aria-hidden="true"><span>_</span><span>□</span><span class="control-close">×</span></div>
+      </div>
+
+      <div class="toolbar">
+        <div class="toolbar-actions">
+          <button class="add-button" id="open-add" type="button"><span class="plus-icon" aria-hidden="true">+</span> Nový projekt</button>
+          <span class="toolbar-hint">PŘIDEJ SI SVŮJ DALŠÍ NÁPAD</span>
+        </div>
+        <label class="search-box"><span class="search-icon" aria-hidden="true"></span><span class="sr-only">Hledat projekty</span><input id="search" type="search" placeholder="Hledat projekt..." autocomplete="off"><kbd>⌕</kbd></label>
+      </div>
+
+      <div class="pathbar"><span class="path-computer" aria-hidden="true">▣</span><span>Tento počítač</span><span class="path-chevron">›</span><span class="path-folder" aria-hidden="true">▰</span><span id="path-current">Projekty</span><button class="folder-up" id="folder-up" type="button" hidden>↑ O úroveň výš</button><span class="path-spacer"></span><span class="view-label">ZOBRAZENÍ: IKONY</span><button class="view-toggle" id="view-toggle" type="button" aria-label="Přepnout zobrazení" title="Přepnout zobrazení"><span></span><span></span><span></span><span></span></button></div>
+
+      <div class="content-area">
+        <aside class="sidebar" aria-label="Navigace">
+          <div class="side-heading">RYCHLÝ PŘÍSTUP</div>
+          <button class="nav-item active" data-filter="all" type="button"><span class="nav-pixel home-pixel">⌂</span> Všechny projekty <span class="nav-count" id="all-count">0</span></button>
+          <button class="nav-item" data-filter="favorite" type="button"><span class="nav-pixel star-pixel">★</span> Oblíbené</button>
+          <div class="side-divider"></div>
+          <div class="side-heading categories-heading">KATEGORIE</div>
+          <button class="nav-item category-link" data-filter="web" type="button"><span class="category-dot dot-blue"></span> Web &amp; aplikace</button>
+          <button class="nav-item category-link" data-filter="design" type="button"><span class="category-dot dot-pink"></span> Design</button>
+          <button class="nav-item category-link" data-filter="code" type="button"><span class="category-dot dot-green"></span> Vývoj</button>
+          <button class="nav-item category-link" data-filter="other" type="button"><span class="category-dot dot-yellow"></span> Ostatní</button>
+          <div class="sidebar-note"><span class="note-spark">✳</span><span>Malé kroky.<br><b>Velké projekty.</b></span></div>
+        </aside>
+
+        <section class="projects-pane" aria-labelledby="pane-heading">
+          <div class="pane-heading-row"><div><div class="eyebrow">TVOJE DIGITÁLNÍ DÍLNA</div><h1 id="pane-heading">Všechny projekty<span class="heading-period">.</span></h1></div><div class="pane-heading-tools"><section class="weather-widget" aria-label="Aktuální počasí"><div class="weather-symbol" id="weather-symbol" aria-hidden="true">☀</div><div class="weather-main"><div class="weather-place" id="weather-place">Zjišťuji polohu…</div><div class="weather-reading"><strong id="weather-temperature">--°</strong><span class="weather-humidity"><span aria-hidden="true">◌</span> <span id="weather-humidity">--%</span></span></div></div><button class="weather-refresh" id="weather-refresh" type="button" aria-label="Obnovit počasí a polohu" title="Obnovit počasí a polohu">↻</button><span class="weather-source"><a href="https://open-meteo.com/" target="_blank" rel="noreferrer">OPEN-METEO</a> · <a href="https://www.bigdatacloud.com/" target="_blank" rel="noreferrer">BIGDATACLOUD</a></span></section><div class="sort-label"><span class="sort-bars">☷</span> NÁZEV <span class="sort-arrow">↕</span></div></div></div>
+          <div class="project-grid" id="project-grid" aria-live="polite"></div>
+          <div class="empty-state" id="empty-state" hidden><div class="empty-icon">▧</div><h2 id="empty-title">Tady je zatím volno.</h2><p id="empty-copy">Přidej první projekt a dej svým nápadům domov.</p><button class="text-button" id="empty-add" type="button">＋ Přidat projekt</button></div>
+          <div class="pane-bottom"><span><span class="bottom-star">✦</span> TVŮJ PROSTOR, TVOJE PRAVIDLA</span><span id="bottom-count">0 položek</span></div>
+        </section>
+      </div>
+      <footer class="statusbar"><span class="status-square"></span><span id="status-count">0 položek</span><span class="status-spacer"></span><span class="status-tip"><span class="tip-key">✦</span> VYBER SI, NA ČEM DNESKA ZAPRACUJEŠ</span><span class="status-grid" aria-hidden="true">▦</span></footer>
+    </section>
+    <div class="desktop-caption"><span class="caption-square"></span> PIXEL DESK <span class="caption-sep">/</span> TVŮJ OSOBNÍ ROZCESTNÍK <span class="caption-right">VERZE 1.0 <span>●</span></span></div>
+  </main>
+
+  <dialog class="project-dialog" id="project-dialog" aria-labelledby="dialog-title">
+    <form id="project-form">
+      <div class="dialog-titlebar"><span class="dialog-folder" aria-hidden="true">▰</span><span id="dialog-title">Nový projekt</span><button class="dialog-x" id="close-dialog" type="button" aria-label="Zavřít">×</button></div>
+      <div class="dialog-body"><p class="dialog-intro">Každý velký projekt někde začíná. Třeba tady.</p>
+        <label class="field-label" for="project-name">NÁZEV PROJEKTU <span>*</span></label><input class="field-input" id="project-name" name="name" type="text" maxlength="48" placeholder="Např. Můj nový web" required>
+        <label class="field-label" for="project-url">URL ODKAZ <span>*</span></label><input class="field-input" id="project-url" name="url" type="text" placeholder="https://... nebo lokální cesta" required>
+        <label class="field-label" for="project-description">POPIS <span class="optional">VOLITELNÉ</span></label><textarea class="field-input field-textarea" id="project-description" name="description" maxlength="110" rows="2" placeholder="O čem projekt je?"></textarea>
+        <label class="field-label" for="project-category">IKONA / KATEGORIE</label><div class="category-select-wrap"><span class="select-emoji" id="select-emoji">🌐</span><select class="field-input category-select" id="project-category" name="category"><option value="web">Web &amp; aplikace</option><option value="design">Design</option><option value="code">Vývoj</option><option value="other">Ostatní</option></select><span class="select-chevron">▾</span></div>
+        <label class="favorite-check"><input type="checkbox" id="project-favorite" name="favorite"><span class="fake-check">✓</span><span>Přidat mezi oblíbené <span class="check-star">★</span></span></label>
+      </div>
+      <div class="dialog-footer"><button class="cancel-button" id="cancel-dialog" type="button">Zrušit</button><button class="save-button" type="submit"><span>＋</span> Uložit projekt</button></div>
+    </form>
+  </dialog>
+  <dialog class="terminal-dialog" id="project-source-dialog" aria-labelledby="terminal-title">
+    <div class="terminal-titlebar"><span class="terminal-mark" aria-hidden="true">🐍</span><span id="terminal-title">Zdrojový soubor projektu</span><button class="dialog-x" id="close-terminal" type="button" aria-label="Zavřít náhled">×</button></div>
+    <div class="terminal-body"><div class="terminal-project-path" id="terminal-project-path">web\Projects</div><p class="terminal-safety">Prohlížeč zdrojového kódu Pythonu · pouze pro čtení.</p><div class="source-actions"><label class="source-file-label">📂 Otevřít .py soubor<input id="project-source-file" type="file" accept=".py,text/x-python"></label></div><pre class="terminal-output source-output" id="project-source" tabindex="0" aria-label="Zdrojový kód projektu" aria-live="polite">Vyber Python projekt nebo otevři .py soubor z disku.</pre><div class="terminal-status" id="project-source-status">Čekám na zdrojový soubor.</div></div>
+    <div class="terminal-footer"><button class="cancel-button" id="cancel-terminal" type="button">Zavřít</button></div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+</body>
+</html>
