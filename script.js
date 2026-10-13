@@ -167,11 +167,12 @@
     open.setAttribute('aria-hidden', 'true');
     footer.append(category, open);
     const remove = document.createElement('button');
-    remove.className = 'card-delete';
+    remove.className = 'card-delete admin-only';
     remove.type = 'button';
     remove.textContent = '× ODEBRAT';
     remove.setAttribute('aria-label', `Odebrat projekt ${project.name}`);
     remove.hidden = !isAdmin;
+    remove.disabled = !isAdmin;
     remove.addEventListener('click', async event => {
       event.stopPropagation();
       if (!isAdmin) return;
