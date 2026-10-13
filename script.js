@@ -166,28 +166,29 @@
     open.textContent = project.kind === 'folder' ? '›' : isPythonFileProject(project) ? '⌕' : '↗';
     open.setAttribute('aria-hidden', 'true');
     footer.append(category, open);
-    const remove = document.createElement('button');
-    remove.className = 'card-delete admin-only';
-    remove.type = 'button';
-    remove.textContent = '× ODEBRAT';
-    remove.setAttribute('aria-label', `Odebrat projekt ${project.name}`);
-    remove.hidden = !isAdmin;
-    remove.disabled = !isAdmin;
-    remove.addEventListener('click', async event => {
-      event.stopPropagation();
-      if (!isAdmin) return;
-      try {
-        await apiRequest(`/api/projects/${encodeURIComponent(project.id)}`, { method: 'DELETE' });
-        projects = projects.filter(item => item.id !== project.id);
-        saveProjects();
-        render();
-        showToast('Projekt byl odebrán ze sdíleného seznamu.');
-      } catch (error) {
-        showToast(`Projekt se nepodařilo odebrat: ${error.message}`);
-      }
-    });
     card.append(top, name, description, footer);
-    if (!project.builtin) card.append(remove);
+    // Do not create destructive controls in the public DOM at all.
+    if (isAdmin && !project.builtin) {
+      const remove = document.createElement('button');
+      remove.className = 'card-delete admin-only';
+      remove.type = 'button';
+      remove.textContent = '× ODEBRAT';
+      remove.setAttribute('aria-label', `Odebrat projekt ${project.name}`);
+      remove.addEventListener('click', async event => {
+        event.stopPropagation();
+        if (!isAdmin) return;
+        try {
+          await apiRequest(`/api/projects/${encodeURIComponent(project.id)}`, { method: 'DELETE' });
+          projects = projects.filter(item => item.id !== project.id);
+          saveProjects();
+          render();
+          showToast('Projekt byl odebrán ze sdíleného seznamu.');
+        } catch (error) {
+          showToast(`Projekt se nepodařilo odebrat: ${error.message}`);
+        }
+      });
+      card.append(remove);
+    }
     card.addEventListener('click', () => {
       if (project.kind === 'folder') {
         enterFolder(project.id);
