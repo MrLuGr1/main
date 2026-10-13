@@ -2,12 +2,8 @@
   'use strict';
 
   const STORAGE_KEY = 'pixel-desk-projects-v1';
-  const ADMIN_SESSION_KEY = 'pixel-desk-admin-session-v1';
-  // Demo default password is admin123. To change it, generate a hash in the browser console:
-  // crypto.subtle.digest('SHA-256', new TextEncoder().encode('your-new-password'))
-  //   .then(bytes => console.log([...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, '0')).join('')))
-  // Replace the value below with the resulting hex string.
-  const ADMIN_PASSWORD_HASH = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
+  // This URL is public configuration, not a secret. Passwords and session tokens never go in source control.
+  const API_BASE = (document.querySelector('meta[name="pixel-desk-api"]')?.content || '').trim().replace(/\/$/, '');
   const REMOVED_BUILTIN_IDS = new Set(['dos-tools-folder', 'dos-penetration-test', 'dos-request-spammer']);
   const categoryInfo = {
     web: { label: 'Web & aplikace', icon: '🌐', iconClass: 'web' },
@@ -33,10 +29,8 @@
   let activeFolder = null;
   let query = '';
   let toastTimer;
-  let isAdmin = (() => {
-    try { return sessionStorage.getItem(ADMIN_SESSION_KEY) === 'authenticated'; }
-    catch { return false; }
-  })();
+  let adminToken = '';
+  let isAdmin = false;
 
   function readProjects() {
     try {
@@ -74,6 +68,31 @@
     } catch (error) {
       console.warn('Projekty se nepodařilo uložit do localStorage.', error);
       return false;
+    }
+  }
+
+  async function apiRequest(path, options = {}) {
+    if (!API_BASE) throw new Error('Zabezpečené API ještě není nakonfigurováno.');
+    const headers = new Headers(options.headers || {});
+    if (options.body) headers.set('Content-Type', 'application/json');
+    if (adminToken) headers.set('Authorization', `Bearer ${adminToken}`);
+    const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `API vrátilo chybu ${response.status}.`);
+    return payload;
+  }
+
+  async function loadSharedProjects() {
+    if (!API_BASE) return;
+    try {
+      const result = await apiRequest('/api/projects');
+      const custom = Array.isArray(result.projects) ? result.projects.filter(isValidProject) : [];
+      projects = [...starterProjects, ...custom];
+      saveProjects();
+      render();
+    } catch (error) {
+      console.warn('Sdílené projekty se nepodařilo načíst.', error);
+      showToast('Sdílený seznam není dostupný; zobrazuji místní kopii.');
     }
   }
 
@@ -153,13 +172,18 @@
     remove.textContent = '× ODEBRAT';
     remove.setAttribute('aria-label', `Odebrat projekt ${project.name}`);
     remove.hidden = !isAdmin;
-    remove.addEventListener('click', event => {
+    remove.addEventListener('click', async event => {
       event.stopPropagation();
       if (!isAdmin) return;
-      projects = projects.filter(item => item.id !== project.id);
-      const saved = saveProjects();
-      render();
-      showToast(saved ? 'Projekt byl odebrán.' : 'Projekt odebrán, ale změna se neuložila.');
+      try {
+        await apiRequest(`/api/projects/${encodeURIComponent(project.id)}`, { method: 'DELETE' });
+        projects = projects.filter(item => item.id !== project.id);
+        saveProjects();
+        render();
+        showToast('Projekt byl odebrán ze sdíleného seznamu.');
+      } catch (error) {
+        showToast(`Projekt se nepodařilo odebrat: ${error.message}`);
+      }
     });
     card.append(top, name, description, footer);
     if (!project.builtin) card.append(remove);
@@ -306,19 +330,8 @@
     button.title = isAdmin ? 'Odhlásit správce' : 'Přihlásit se jako správce';
   }
 
-  function bytesToHex(bytes) {
-    return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
-  }
-
-  function constantTimeEqual(left, right) {
-    if (left.length !== right.length) return false;
-    let difference = 0;
-    for (let index = 0; index < left.length; index++) difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
-    return difference === 0;
-  }
-
   function signOutAdmin() {
-    try { sessionStorage.removeItem(ADMIN_SESSION_KEY); } catch { /* Still lock controls for this page. */ }
+    adminToken = '';
     isAdmin = false;
     applyAdminMode();
     render();
@@ -358,20 +371,10 @@
     event.preventDefault();
     adminLoginStatus.textContent = '';
     if (!adminLoginForm.reportValidity()) return;
-    if (!globalThis.crypto?.subtle) {
-      adminLoginStatus.textContent = 'Web Crypto není dostupné. Otevři aplikaci přes HTTPS nebo localhost.';
-      return;
-    }
     try {
-      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(adminPassword.value));
-      const enteredHash = bytesToHex(new Uint8Array(digest));
-      if (!constantTimeEqual(enteredHash, ADMIN_PASSWORD_HASH)) {
-        adminLoginStatus.textContent = 'Heslo není správné.';
-        adminPassword.value = '';
-        adminPassword.focus();
-        return;
-      }
-      sessionStorage.setItem(ADMIN_SESSION_KEY, 'authenticated');
+      const result = await apiRequest('/api/login', { method: 'POST', body: JSON.stringify({ password: adminPassword.value }) });
+      if (typeof result.token !== 'string' || !result.token) throw new Error('Server nevrátil platnou relaci.');
+      adminToken = result.token;
       isAdmin = true;
       adminPassword.value = '';
       adminDialog.close();
@@ -379,7 +382,9 @@
       render();
       showToast('Správcovský režim aktivní.');
     } catch (error) {
-      adminLoginStatus.textContent = `Přihlášení se nepodařilo (${error.message}).`;
+      adminLoginStatus.textContent = error.message === 'Heslo není správné.' ? error.message : `Přihlášení se nepodařilo: ${error.message}`;
+      adminPassword.value = '';
+      adminPassword.focus();
     }
   });
   document.querySelector('#close-dialog').addEventListener('click', () => dialog.close());
@@ -420,7 +425,7 @@
     event.currentTarget.title = list ? 'Zobrazení seznamu' : 'Zobrazení ikon';
   });
 
-  form.addEventListener('submit', event => {
+  form.addEventListener('submit', async event => {
     event.preventDefault();
     if (!isAdmin) return;
     if (!form.reportValidity()) return;
@@ -435,15 +440,21 @@
       parentId: activeFolder || undefined,
     };
     if (!project.name || !project.url) return;
+    try {
+      await apiRequest('/api/projects', { method: 'POST', body: JSON.stringify(project) });
+    } catch (error) {
+      showToast(`Projekt se nepodařilo uložit: ${error.message}`);
+      return;
+    }
     projects.unshift(project);
-    const saved = saveProjects();
+    saveProjects();
     activeFilter = 'all';
     query = '';
     search.value = '';
     document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.filter === 'all'));
     render();
     dialog.close();
-    showToast(saved ? 'Projekt přidán do rozcestníku.' : 'Projekt přidán, ale změna se neuložila.');
+    showToast('Projekt přidán do sdíleného rozcestníku.');
   });
 
   // Small, square canvas particles keep the trail light and crisp at any screen size.
@@ -585,9 +596,11 @@
   document.querySelector('#weather-refresh').addEventListener('click', requestLocalWeather);
 
   applyAdminMode();
+  loadSharedProjects();
   updateClock();
   setInterval(updateClock, 30_000);
   render();
   startPixelTrail();
   requestLocalWeather();
 })();
+
