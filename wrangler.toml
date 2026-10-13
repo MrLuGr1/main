@@ -1,0 +1,10 @@
+name = "pixel-desk-admin"
+main = "admin-worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+REPO_OWNER = "MrLuGr1"
+REPO_NAME = "main"
+REPO_BRANCH = "main"
+ALLOWED_ORIGINS = "https://mrlugr1.github.io"
+
