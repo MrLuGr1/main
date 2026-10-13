@@ -17,7 +17,7 @@
         <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
         <span>PIXEL<span class="brand-light">_DESK</span></span>
       </a>
-      <div class="topbar-right"><span class="status-dot"></span><span>MOJE PROJEKTY</span><span class="topbar-divider"></span><span id="clock">--:--</span><button class="theme-toggle" id="theme-toggle" type="button" aria-label="Přepnout na tmavý režim" title="Přepnout režim"><span class="theme-icon" aria-hidden="true">◐</span><span id="theme-label">TMAVÝ REŽIM</span></button></div>
+      <div class="topbar-right"><span class="status-dot"></span><span>MOJE PROJEKTY</span><span class="topbar-divider"></span><span id="clock">--:--</span><button class="admin-toggle" id="admin-toggle" type="button" aria-label="Přihlášení správce"><span aria-hidden="true">▣</span> Admin Login</button><button class="theme-toggle" id="theme-toggle" type="button" aria-label="Přepnout na tmavý režim" title="Přepnout režim"><span class="theme-icon" aria-hidden="true">◐</span><span id="theme-label">TMAVÝ REŽIM</span></button></div>
     </header>
 
     <section class="window" id="home" aria-label="Správce projektů">
@@ -28,7 +28,7 @@
 
       <div class="toolbar">
         <div class="toolbar-actions">
-          <button class="add-button" id="open-add" type="button"><span class="plus-icon" aria-hidden="true">+</span> Nový projekt</button>
+          <button class="add-button admin-only" id="open-add" type="button" hidden><span class="plus-icon" aria-hidden="true">+</span> Nový projekt</button>
           <span class="toolbar-hint">PŘIDEJ SI SVŮJ DALŠÍ NÁPAD</span>
         </div>
         <label class="search-box"><span class="search-icon" aria-hidden="true"></span><span class="sr-only">Hledat projekty</span><input id="search" type="search" placeholder="Hledat projekt..." autocomplete="off"><kbd>⌕</kbd></label>
@@ -53,7 +53,7 @@
         <section class="projects-pane" aria-labelledby="pane-heading">
           <div class="pane-heading-row"><div><div class="eyebrow">TVOJE DIGITÁLNÍ DÍLNA</div><h1 id="pane-heading">Všechny projekty<span class="heading-period">.</span></h1></div><div class="pane-heading-tools"><section class="weather-widget" aria-label="Aktuální počasí"><div class="weather-symbol" id="weather-symbol" aria-hidden="true">☀</div><div class="weather-main"><div class="weather-place" id="weather-place">Zjišťuji polohu…</div><div class="weather-reading"><strong id="weather-temperature">--°</strong><span class="weather-humidity"><span aria-hidden="true">◌</span> <span id="weather-humidity">--%</span></span></div></div><button class="weather-refresh" id="weather-refresh" type="button" aria-label="Obnovit počasí a polohu" title="Obnovit počasí a polohu">↻</button><span class="weather-source"><a href="https://open-meteo.com/" target="_blank" rel="noreferrer">OPEN-METEO</a> · <a href="https://www.bigdatacloud.com/" target="_blank" rel="noreferrer">BIGDATACLOUD</a></span></section><div class="sort-label"><span class="sort-bars">☷</span> NÁZEV <span class="sort-arrow">↕</span></div></div></div>
           <div class="project-grid" id="project-grid" aria-live="polite"></div>
-          <div class="empty-state" id="empty-state" hidden><div class="empty-icon">▧</div><h2 id="empty-title">Tady je zatím volno.</h2><p id="empty-copy">Přidej první projekt a dej svým nápadům domov.</p><button class="text-button" id="empty-add" type="button">＋ Přidat projekt</button></div>
+          <div class="empty-state" id="empty-state" hidden><div class="empty-icon">▧</div><h2 id="empty-title">Tady je zatím volno.</h2><p id="empty-copy">Přidej první projekt a dej svým nápadům domov.</p><button class="text-button admin-only" id="empty-add" type="button" hidden>＋ Přidat projekt</button></div>
           <div class="pane-bottom"><span><span class="bottom-star">✦</span> TVŮJ PROSTOR, TVOJE PRAVIDLA</span><span id="bottom-count">0 položek</span></div>
         </section>
       </div>
@@ -73,6 +73,16 @@
         <label class="favorite-check"><input type="checkbox" id="project-favorite" name="favorite"><span class="fake-check">✓</span><span>Přidat mezi oblíbené <span class="check-star">★</span></span></label>
       </div>
       <div class="dialog-footer"><button class="cancel-button" id="cancel-dialog" type="button">Zrušit</button><button class="save-button" type="submit"><span>＋</span> Uložit projekt</button></div>
+    </form>
+  </dialog>
+  <dialog class="project-dialog admin-dialog" id="admin-dialog" aria-labelledby="admin-title">
+    <form id="admin-login-form">
+      <div class="dialog-titlebar"><span class="dialog-folder" aria-hidden="true">▣</span><span id="admin-title">Přihlášení správce</span><button class="dialog-x" id="close-admin-dialog" type="button" aria-label="Zavřít">×</button></div>
+      <div class="dialog-body"><p class="dialog-intro">Přihlášení odemkne přidávání a mazání projektů v tomto prohlížeči.</p><p class="admin-security-note">Lokální UI zámek není náhradou serverového ověřování a lze jej obejít přes vývojářské nástroje.</p>
+        <label class="field-label" for="admin-password">HESLO SPRÁVCE</label><input class="field-input" id="admin-password" name="password" type="password" autocomplete="current-password" required>
+        <p class="admin-login-status" id="admin-login-status" role="alert" aria-live="polite"></p>
+      </div>
+      <div class="dialog-footer"><button class="cancel-button" id="cancel-admin-login" type="button">Zrušit</button><button class="save-button" type="submit">Přihlásit</button></div>
     </form>
   </dialog>
   <dialog class="terminal-dialog" id="project-source-dialog" aria-labelledby="terminal-title">

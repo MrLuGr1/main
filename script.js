@@ -2,6 +2,12 @@
   'use strict';
 
   const STORAGE_KEY = 'pixel-desk-projects-v1';
+  const ADMIN_SESSION_KEY = 'pixel-desk-admin-session-v1';
+  // Demo default password is admin123. To change it, generate a hash in the browser console:
+  // crypto.subtle.digest('SHA-256', new TextEncoder().encode('your-new-password'))
+  //   .then(bytes => console.log([...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, '0')).join('')))
+  // Replace the value below with the resulting hex string.
+  const ADMIN_PASSWORD_HASH = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
   const REMOVED_BUILTIN_IDS = new Set(['dos-tools-folder', 'dos-penetration-test', 'dos-request-spammer']);
   const categoryInfo = {
     web: { label: 'Web & aplikace', icon: '🌐', iconClass: 'web' },
@@ -27,6 +33,10 @@
   let activeFolder = null;
   let query = '';
   let toastTimer;
+  let isAdmin = (() => {
+    try { return sessionStorage.getItem(ADMIN_SESSION_KEY) === 'authenticated'; }
+    catch { return false; }
+  })();
 
   function readProjects() {
     try {
@@ -142,8 +152,10 @@
     remove.type = 'button';
     remove.textContent = '× ODEBRAT';
     remove.setAttribute('aria-label', `Odebrat projekt ${project.name}`);
+    remove.hidden = !isAdmin;
     remove.addEventListener('click', event => {
       event.stopPropagation();
+      if (!isAdmin) return;
       projects = projects.filter(item => item.id !== project.id);
       const saved = saveProjects();
       render();
@@ -285,7 +297,36 @@
     toastTimer = setTimeout(() => toast.classList.remove('show'), 2400);
   }
 
+  function applyAdminMode() {
+    document.body.dataset.adminMode = isAdmin ? 'true' : 'false';
+    document.querySelectorAll('.admin-only').forEach(element => { element.hidden = !isAdmin; });
+    const button = document.querySelector('#admin-toggle');
+    button.innerHTML = isAdmin ? '<span aria-hidden="true">▣</span> Admin · Odhlásit' : '<span aria-hidden="true">▣</span> Admin Login';
+    button.setAttribute('aria-label', isAdmin ? 'Odhlásit správce' : 'Přihlášení správce');
+    button.title = isAdmin ? 'Odhlásit správce' : 'Přihlásit se jako správce';
+  }
+
+  function bytesToHex(bytes) {
+    return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+  }
+
+  function constantTimeEqual(left, right) {
+    if (left.length !== right.length) return false;
+    let difference = 0;
+    for (let index = 0; index < left.length; index++) difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+    return difference === 0;
+  }
+
+  function signOutAdmin() {
+    try { sessionStorage.removeItem(ADMIN_SESSION_KEY); } catch { /* Still lock controls for this page. */ }
+    isAdmin = false;
+    applyAdminMode();
+    render();
+    showToast('Odhlášení správce proběhlo.');
+  }
+
   function showDialog() {
+    if (!isAdmin) return;
     form.reset();
     updateSelectIcon();
     dialog.showModal();
@@ -298,6 +339,49 @@
 
   document.querySelector('#open-add').addEventListener('click', showDialog);
   document.querySelector('#empty-add').addEventListener('click', showDialog);
+  const adminDialog = document.querySelector('#admin-dialog');
+  const adminLoginForm = document.querySelector('#admin-login-form');
+  const adminPassword = document.querySelector('#admin-password');
+  const adminLoginStatus = document.querySelector('#admin-login-status');
+  document.querySelector('#admin-toggle').addEventListener('click', () => {
+    if (isAdmin) {
+      signOutAdmin();
+      return;
+    }
+    adminLoginStatus.textContent = '';
+    adminDialog.showModal();
+    requestAnimationFrame(() => adminPassword.focus());
+  });
+  document.querySelector('#close-admin-dialog').addEventListener('click', () => adminDialog.close());
+  document.querySelector('#cancel-admin-login').addEventListener('click', () => adminDialog.close());
+  adminLoginForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    adminLoginStatus.textContent = '';
+    if (!adminLoginForm.reportValidity()) return;
+    if (!globalThis.crypto?.subtle) {
+      adminLoginStatus.textContent = 'Web Crypto není dostupné. Otevři aplikaci přes HTTPS nebo localhost.';
+      return;
+    }
+    try {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(adminPassword.value));
+      const enteredHash = bytesToHex(new Uint8Array(digest));
+      if (!constantTimeEqual(enteredHash, ADMIN_PASSWORD_HASH)) {
+        adminLoginStatus.textContent = 'Heslo není správné.';
+        adminPassword.value = '';
+        adminPassword.focus();
+        return;
+      }
+      sessionStorage.setItem(ADMIN_SESSION_KEY, 'authenticated');
+      isAdmin = true;
+      adminPassword.value = '';
+      adminDialog.close();
+      applyAdminMode();
+      render();
+      showToast('Správcovský režim aktivní.');
+    } catch (error) {
+      adminLoginStatus.textContent = `Přihlášení se nepodařilo (${error.message}).`;
+    }
+  });
   document.querySelector('#close-dialog').addEventListener('click', () => dialog.close());
   document.querySelector('#cancel-dialog').addEventListener('click', () => dialog.close());
   categorySelect.addEventListener('change', updateSelectIcon);
@@ -338,6 +422,7 @@
 
   form.addEventListener('submit', event => {
     event.preventDefault();
+    if (!isAdmin) return;
     if (!form.reportValidity()) return;
     const data = new FormData(form);
     const project = {
@@ -499,6 +584,7 @@
   }
   document.querySelector('#weather-refresh').addEventListener('click', requestLocalWeather);
 
+  applyAdminMode();
   updateClock();
   setInterval(updateClock, 30_000);
   render();

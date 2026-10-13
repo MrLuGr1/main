@@ -113,3 +113,18 @@
 .source-output .tok-keyword{color:#84b9f4;font-weight:700}.source-output .tok-builtin{color:#9fd7bb}.source-output .tok-constant{color:#f19cb4}.source-output .tok-operator{color:#93c6df}
 @media(max-width:510px){.topbar-right>.status-dot,.topbar-divider,#clock{display:none}}
 @media(max-width:370px){#theme-label{display:none}}
+
+.admin-toggle{min-height:30px;display:flex;align-items:center;gap:6px;padding:0 9px;border:1px solid #d6dce5;background:#f9fafc;color:#657187;font:10px var(--mono);cursor:pointer;white-space:nowrap;box-shadow:2px 2px 0 #e0e4eb}
+.admin-toggle:hover{border-color:#9c91e6;color:#5e50c1;transform:translateY(-1px)}
+.admin-toggle span{color:#7d70d7;font-size:14px}
+.admin-only[hidden]{display:none!important}
+body[data-admin-mode="true"] .project-card .card-delete{display:block}
+body[data-admin-mode="true"] .project-card .card-category{visibility:hidden}
+.admin-dialog{width:min(400px,calc(100vw - 28px))}
+.admin-security-note{margin:0 0 14px;padding:8px 10px;border-left:2px solid #e4b858;background:#fff9e9;color:#85734c;font-size:10px;line-height:1.45}
+.admin-login-status{min-height:18px;margin:9px 0 0;color:#c06068;font-size:11px;line-height:1.45}
+.admin-login-status:empty{min-height:0;margin:0}
+:root[data-theme="dark"] .admin-toggle{background:#202a39;border-color:#465266;color:#d0d8e6;box-shadow:2px 2px 0 #111824}
+:root[data-theme="dark"] .admin-toggle:hover{border-color:#9c91e6;color:#d8d2ff}
+:root[data-theme="dark"] .admin-security-note{background:#302d24;border-color:#e4b858;color:#ddd1ae}
+@media(max-width:510px){.admin-toggle{min-height:30px;padding:0 6px;font-size:9px}.topbar-right{gap:6px}}
