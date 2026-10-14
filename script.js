@@ -14,7 +14,8 @@
     other: { label: 'Ostatní', icon: '🪴', iconClass: 'other' },
   };
   const starterProjects = [];
-  // Offline fallback only; the shared projects.json remains authoritative when the API is available.
+  // Offline fallback only. When the shared API responds, projects.json is the source of truth,
+  // so an admin deletion is not undone by a hard-coded starter entry.
   const qrMakerFallback = { id: 'qr-maker', name: 'QR maker', description: 'Lokální generátor QR kódů pro odkazy, zprávy i platby.', url: 'QR_maker/index.html', category: 'web', favorite: false };
 
   function withQrMakerFallback(list) {
@@ -37,6 +38,8 @@
   let toastTimer;
   let adminToken = '';
   let isAdmin = false;
+  let editingProjectId = '';
+  let faviconRequestId = 0;
 
   function readProjects() {
     try {
@@ -61,6 +64,14 @@
   function isValidProject(project) {
     return project && typeof project.id === 'string' && typeof project.name === 'string' &&
       typeof project.url === 'string' && categoryInfo[project.category] && !isRemovedDemoProject(project);
+  }
+
+  function validFaviconUrl(value) {
+    if (typeof value !== 'string' || value.length > 1000) return '';
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:' ? url.href : '';
+    } catch { return ''; }
   }
 
   let projects = readProjects();
@@ -146,7 +157,18 @@
     const icon = document.createElement('span');
     icon.className = `project-icon ${info.iconClass}`;
     icon.setAttribute('aria-hidden', 'true');
-    icon.textContent = project.kind === 'folder' ? '📁' : project.kind === 'python' ? '🐍' : info.icon;
+    const fallbackIcon = project.kind === 'folder' ? '📁' : project.kind === 'python' ? '🐍' : info.icon;
+    const favicon = validFaviconUrl(project.iconUrl);
+    if (favicon && project.kind !== 'folder' && project.kind !== 'python') {
+      const image = document.createElement('img');
+      image.src = favicon;
+      image.alt = '';
+      image.loading = 'lazy';
+      image.addEventListener('error', () => { icon.replaceChildren(document.createTextNode(fallbackIcon)); }, { once: true });
+      icon.append(image);
+    } else {
+      icon.textContent = fallbackIcon;
+    }
     if (project.kind === 'folder') icon.classList.add('folder-icon');
     if (project.kind === 'python') icon.classList.add('python-icon');
     const favorite = document.createElement('span');
@@ -173,8 +195,19 @@
     open.setAttribute('aria-hidden', 'true');
     footer.append(category, open);
     card.append(top, name, description, footer);
-    // Do not create destructive controls in the public DOM at all.
+    // Admin controls are omitted from the public DOM entirely.
     if (isAdmin && !project.builtin) {
+      const actions = document.createElement('div');
+      actions.className = 'card-actions';
+      const edit = document.createElement('button');
+      edit.className = 'card-edit admin-only';
+      edit.type = 'button';
+      edit.textContent = '✎ UPRAVIT';
+      edit.setAttribute('aria-label', `Upravit projekt ${project.name}`);
+      edit.addEventListener('click', event => {
+        event.stopPropagation();
+        if (isAdmin) showDialog(project);
+      });
       const remove = document.createElement('button');
       remove.className = 'card-delete admin-only';
       remove.type = 'button';
@@ -193,7 +226,8 @@
           showToast(`Projekt se nepodařilo odebrat: ${error.message}`);
         }
       });
-      card.append(remove);
+      actions.append(edit, remove);
+      card.append(actions);
     }
     card.addEventListener('click', () => {
       if (project.kind === 'folder') {
@@ -346,20 +380,96 @@
     showToast('Odhlášení správce proběhlo.');
   }
 
-  function showDialog() {
+  function showDialog(project = null) {
     if (!isAdmin) return;
+    document.querySelector('#load-favicon').disabled = false;
     form.reset();
     updateSelectIcon();
+    editingProjectId = project?.id || '';
+    document.querySelector('#dialog-title').textContent = project ? 'Upravit projekt' : 'Nový projekt';
+    document.querySelector('#project-id').value = project?.id || '';
+    document.querySelector('#project-name').value = project?.name || '';
+    document.querySelector('#project-url').value = project?.url || '';
+    document.querySelector('#project-description').value = project?.description || '';
+    categorySelect.value = project?.category || 'web';
+    document.querySelector('#project-favorite').checked = Boolean(project?.favorite);
+    document.querySelector('#project-icon-url').value = validFaviconUrl(project?.iconUrl) || '';
+    document.querySelector('#save-project-label').textContent = project ? 'Uložit změny' : 'Uložit projekt';
+    updateSelectIcon();
+    faviconRequestId += 1;
+    updateFaviconPreview(document.querySelector('#project-icon-url').value);
     dialog.showModal();
     requestAnimationFrame(() => document.querySelector('#project-name').focus());
   }
 
   function updateSelectIcon() {
     document.querySelector('#select-emoji').textContent = categoryInfo[categorySelect.value].icon;
+    if (!document.querySelector('#project-icon-url').value) updateFaviconPreview('');
+  }
+
+  function updateFaviconPreview(url) {
+    const requestId = ++faviconRequestId;
+    const preview = document.querySelector('#project-favicon-preview');
+    const safeUrl = validFaviconUrl(url);
+    const fallback = categoryInfo[categorySelect.value]?.icon || '🌐';
+    preview.replaceChildren(document.createTextNode(fallback));
+    if (!safeUrl) return;
+    const image = document.createElement('img');
+    image.alt = '';
+    image.src = safeUrl;
+    image.addEventListener('load', () => { if (requestId === faviconRequestId) preview.replaceChildren(image); }, { once: true });
+    image.addEventListener('error', () => {
+      if (requestId !== faviconRequestId) return;
+      document.querySelector('#project-icon-url').value = '';
+      document.querySelector('#favicon-status').textContent = 'Ikonu se nepodařilo načíst; použije se pixelová ikona.';
+    }, { once: true });
+  }
+
+  async function fetchProjectFavicon() {
+    const status = document.querySelector('#favicon-status');
+    const button = document.querySelector('#load-favicon');
+    let url;
+    try {
+      url = new URL(document.querySelector('#project-url').value.trim());
+      if (!['http:', 'https:'].includes(url.protocol) || !url.hostname) throw new Error();
+    } catch {
+      document.querySelector('#project-icon-url').value = '';
+      updateFaviconPreview('');
+      status.textContent = 'Zadej platnou webovou adresu http:// nebo https://.';
+      return;
+    }
+    const faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(url.hostname)}&sz=64`;
+    const requestId = ++faviconRequestId;
+    button.disabled = true;
+    status.textContent = 'Načítám ikonu webu…';
+    const image = new Image();
+    image.onload = () => {
+      if (requestId !== faviconRequestId) return;
+      document.querySelector('#project-icon-url').value = faviconUrl;
+      document.querySelector('#project-favicon-preview').replaceChildren(image);
+      status.textContent = `Favicon načtena pro ${url.hostname}.`;
+      button.disabled = false;
+    };
+    image.onerror = () => {
+      if (requestId !== faviconRequestId) return;
+      document.querySelector('#project-icon-url').value = '';
+      updateFaviconPreview('');
+      status.textContent = 'Načtení selhalo; použije se pixelová ikona.';
+      button.disabled = false;
+    };
+    image.src = faviconUrl;
   }
 
   document.querySelector('#open-add').addEventListener('click', showDialog);
   document.querySelector('#empty-add').addEventListener('click', showDialog);
+  document.querySelector('#load-favicon').addEventListener('click', fetchProjectFavicon);
+  document.querySelector('#project-url').addEventListener('input', () => {
+    faviconRequestId += 1;
+    document.querySelector('#load-favicon').disabled = false;
+    document.querySelector('#project-icon-url').value = '';
+    updateFaviconPreview('');
+    document.querySelector('#favicon-status').textContent = 'Pro tuto adresu lze načíst faviconu.';
+  });
   const adminDialog = document.querySelector('#admin-dialog');
   const adminLoginForm = document.querySelector('#admin-login-form');
   const adminPassword = document.querySelector('#admin-password');
@@ -439,22 +549,30 @@
     if (!form.reportValidity()) return;
     const data = new FormData(form);
     const project = {
-      id: globalThis.crypto?.randomUUID?.() || `project-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      id: editingProjectId || globalThis.crypto?.randomUUID?.() || `project-${Date.now()}-${Math.random().toString(16).slice(2)}`,
       name: String(data.get('name')).trim(),
       description: String(data.get('description') || '').trim(),
       url: String(data.get('url')).trim(),
       category: String(data.get('category')),
       favorite: data.get('favorite') === 'on',
-      parentId: activeFolder || undefined,
+      iconUrl: validFaviconUrl(String(data.get('iconUrl') || '')),
+      parentId: (editingProjectId ? projects.find(item => item.id === editingProjectId)?.parentId : activeFolder) || undefined,
     };
     if (!project.name || !project.url) return;
     try {
-      await apiRequest('/api/projects', { method: 'POST', body: JSON.stringify(project) });
+      const method = editingProjectId ? 'PUT' : 'POST';
+      const endpoint = editingProjectId ? `/api/projects/${encodeURIComponent(editingProjectId)}` : '/api/projects';
+      await apiRequest(endpoint, { method, body: JSON.stringify(project) });
     } catch (error) {
       showToast(`Projekt se nepodařilo uložit: ${error.message}`);
       return;
     }
-    projects.unshift(project);
+    if (editingProjectId) {
+      const index = projects.findIndex(item => item.id === editingProjectId);
+      if (index >= 0) projects[index] = project;
+    } else {
+      projects.unshift(project);
+    }
     saveProjects();
     activeFilter = 'all';
     query = '';
@@ -462,7 +580,8 @@
     document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.filter === 'all'));
     render();
     dialog.close();
-    showToast('Projekt přidán do sdíleného rozcestníku.');
+    showToast(editingProjectId ? 'Změny projektu byly uloženy.' : 'Projekt přidán do sdíleného rozcestníku.');
+    editingProjectId = '';
   });
 
   // Small, square canvas particles keep the trail light and crisp at any screen size.
