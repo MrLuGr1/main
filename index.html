@@ -9,8 +9,8 @@
   <script>try{if(localStorage.getItem('pixel-desk-theme-v1')==='dark')document.documentElement.dataset.theme='dark'}catch{}</script>
   <title>Pixel Desk — rozcestník projektů</title>
   <!-- Zvyš verzi ?v= při každém vydání frontendových souborů; běžné obnovení tak stáhne novou kopii. -->
-  <link rel="stylesheet" href="style.css?v=20261014-2">
-  <script src="script.js?v=20261014-2" defer></script>
+  <link rel="stylesheet" href="style.css?v=20261014-3">
+  <script src="script.js?v=20261014-3" defer></script>
 </head>
 <body>
   <canvas id="pixel-trail" aria-hidden="true"></canvas>
@@ -70,12 +70,14 @@
       <div class="dialog-titlebar"><span class="dialog-folder" aria-hidden="true">▰</span><span id="dialog-title">Nový projekt</span><button class="dialog-x" id="close-dialog" type="button" aria-label="Zavřít">×</button></div>
       <div class="dialog-body"><p class="dialog-intro">Každý velký projekt někde začíná. Třeba tady.</p>
         <label class="field-label" for="project-name">NÁZEV PROJEKTU <span>*</span></label><input class="field-input" id="project-name" name="name" type="text" maxlength="48" placeholder="Např. Můj nový web" required>
+        <input id="project-id" name="id" type="hidden"><input id="project-icon-url" name="iconUrl" type="hidden">
         <label class="field-label" for="project-url">URL ODKAZ <span>*</span></label><input class="field-input" id="project-url" name="url" type="text" placeholder="https://... nebo lokální cesta" required>
+        <div class="favicon-row"><span class="favicon-preview" id="project-favicon-preview" aria-hidden="true">🌐</span><button class="cancel-button favicon-button" id="load-favicon" type="button">Načíst faviconu z webu</button><span class="favicon-status" id="favicon-status" aria-live="polite">Výchozí pixelová ikona</span></div>
         <label class="field-label" for="project-description">POPIS <span class="optional">VOLITELNÉ</span></label><textarea class="field-input field-textarea" id="project-description" name="description" maxlength="110" rows="2" placeholder="O čem projekt je?"></textarea>
         <label class="field-label" for="project-category">IKONA / KATEGORIE</label><div class="category-select-wrap"><span class="select-emoji" id="select-emoji">🌐</span><select class="field-input category-select" id="project-category" name="category"><option value="web">Web &amp; aplikace</option><option value="design">Design</option><option value="code">Vývoj</option><option value="other">Ostatní</option></select><span class="select-chevron">▾</span></div>
         <label class="favorite-check"><input type="checkbox" id="project-favorite" name="favorite"><span class="fake-check">✓</span><span>Přidat mezi oblíbené <span class="check-star">★</span></span></label>
       </div>
-      <div class="dialog-footer"><button class="cancel-button" id="cancel-dialog" type="button">Zrušit</button><button class="save-button" type="submit"><span>＋</span> Uložit projekt</button></div>
+      <div class="dialog-footer"><button class="cancel-button" id="cancel-dialog" type="button">Zrušit</button><button class="save-button" type="submit"><span>＋</span> <span id="save-project-label">Uložit projekt</span></button></div>
     </form>
   </dialog>
   <dialog class="project-dialog admin-dialog" id="admin-dialog" aria-labelledby="admin-title">
