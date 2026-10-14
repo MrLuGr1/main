@@ -6,5 +6,13 @@
     "url": "https://www.instagram.com/mr.lugr_art/",
     "category": "web",
     "favorite": false
+  },
+  {
+    "id": "qr-maker",
+    "name": "QR maker",
+    "description": "Lokální generátor QR kódů pro odkazy, zprávy i platby.",
+    "url": "QR_maker/index.html",
+    "category": "web",
+    "favorite": false
   }
 ]
