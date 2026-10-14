@@ -121,11 +121,20 @@ function cleanProject(input) {
   const url = typeof input.url === 'string' ? input.url.trim() : '';
   const category = input.category;
   const parentId = typeof input.parentId === 'string' ? input.parentId : undefined;
+  const iconUrl = typeof input.iconUrl === 'string' ? input.iconUrl : '';
   const webUrl = /^https?:\/\//i.test(url);
   const relativeUrl = /^(?!\/)(?!.*\.\.)([\w./-]+)$/i.test(url);
   if (!/^[\w-]{1,100}$/.test(id) || !name || name.length > 48 || description.length > 110 || !url || url.length > 500) return null;
   if (!['web', 'design', 'code', 'other'].includes(category) || (!webUrl && !relativeUrl)) return null;
-  return { id, name, description, url, category, favorite: Boolean(input.favorite), ...(parentId ? { parentId } : {}) };
+  let safeIconUrl = '';
+  if (iconUrl) {
+    try {
+      const parsedIcon = new URL(iconUrl);
+      if (parsedIcon.protocol === 'https:' && parsedIcon.hostname === 'www.google.com' && parsedIcon.pathname === '/s2/favicons') safeIconUrl = parsedIcon.href;
+      else return null;
+    } catch { return null; }
+  }
+  return { id, name, description, url, category, favorite: Boolean(input.favorite), ...(safeIconUrl ? { iconUrl: safeIconUrl } : {}), ...(parentId ? { parentId } : {}) };
 }
 
 function allowedOrigin(request, env) {
@@ -140,7 +149,7 @@ export default {
     if (!origin) return responseJson({ error: 'Tento web nemá k API přístup.' }, 403);
     const cors = {
       'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Authorization, Content-Type',
       'Vary': 'Origin',
       'X-Content-Type-Options': 'nosniff',
@@ -184,6 +193,17 @@ export default {
         if (projects.length === state.projects.length) return responseJson({ error: 'Projekt nebyl nalezen.' }, 404, cors);
         await writeProjects(env, projects, state.sha);
         return responseJson({ ok: true }, 200, cors);
+      }
+      if (deleteMatch && request.method === 'PUT') {
+        const project = cleanProject(await request.json());
+        if (!project || project.id !== deleteMatch[1]) return responseJson({ error: 'Projekt obsahuje neplatné údaje.' }, 400, cors);
+        const state = await readProjects(env);
+        const index = state.projects.findIndex(item => item.id === deleteMatch[1]);
+        if (index < 0) return responseJson({ error: 'Projekt nebyl nalezen.' }, 404, cors);
+        const projects = [...state.projects];
+        projects[index] = project;
+        await writeProjects(env, projects, state.sha);
+        return responseJson({ ok: true, project }, 200, cors);
       }
       return responseJson({ error: 'Neznámý API endpoint.' }, 404, cors);
     } catch (error) {
