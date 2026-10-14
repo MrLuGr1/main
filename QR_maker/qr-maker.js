@@ -174,15 +174,45 @@
     download.hidden = true;
     placeholder.hidden = true;
     try {
-      new QRCode(output, {
+      const qr = new QRCode(output, {
         text: value,
         width: 280,
         height: 280,
         colorDark: '#101820',
         colorLight: '#ffffff',
-        // M is the QR Platba recommendation; L leaves more room for long ordinary text.
-        correctLevel: modeSelect.value === 'payment' ? QRCode.CorrectLevel.M : QRCode.CorrectLevel.L,
+        // This qrcode.js build names the standard error setting `correctLevel`.
+        // Its makeCode() chooses the smallest QR version that fits the data.
+        correctLevel: QRCode.CorrectLevel.M,
       });
+
+      // Draw the QR matrix ourselves so both the preview and PNG have a true
+      // four-module white quiet zone, independent of the library renderer.
+      const matrix = qr._oQRCode;
+      const moduleCount = matrix?.getModuleCount?.();
+      if (!moduleCount || typeof matrix.isDark !== 'function') throw new Error('QR matice není dostupná.');
+      const quietModules = 4;
+      const totalModules = moduleCount + quietModules * 2;
+      const size = 280;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Canvas není dostupný.');
+      context.imageSmoothingEnabled = false;
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, size, size);
+      context.fillStyle = '#101820';
+      for (let row = 0; row < moduleCount; row++) {
+        for (let column = 0; column < moduleCount; column++) {
+          if (!matrix.isDark(row, column)) continue;
+          const left = Math.round((column + quietModules) * size / totalModules);
+          const top = Math.round((row + quietModules) * size / totalModules);
+          const right = Math.round((column + quietModules + 1) * size / totalModules);
+          const bottom = Math.round((row + quietModules + 1) * size / totalModules);
+          context.fillRect(left, top, right - left, bottom - top);
+        }
+      }
+      output.replaceChildren(canvas);
     } catch (error) {
       output.replaceChildren();
       placeholder.hidden = false;
