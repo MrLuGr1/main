@@ -82,18 +82,16 @@
     return `CZ${checkDigits}${bban}`;
   }
 
-  // Keep UTF-8 letters as literal text, matching George's QR examples. The SPAYD
-  // format allows UTF-8 values; '*' must be escaped because it separates fields.
-  // Other ASCII characters outside the compact alphabet and control bytes are
-  // percent-encoded so that punctuation cannot alter the descriptor structure.
+  // Keep printable ASCII and UTF-8 letters literal, matching George's QR examples
+  // (including lowercase text). Escape only characters that break SPAYD structure,
+  // ambiguous percent escapes, and control bytes.
   function encodeSpaydValue(value) {
-    const allowed = new Set('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 $+-./:');
     return [...value].map(char => {
       if (char === '*') return '%2A';
       if (char === '%') return '%25';
       const codePoint = char.codePointAt(0);
+      if (codePoint >= 0x20 && codePoint <= 0x7e) return char;
       if (codePoint > 0x7f && !(codePoint >= 0x80 && codePoint <= 0x9f)) return char;
-      if (allowed.has(char)) return char;
       return [...new TextEncoder().encode(char)]
         .map(byte => `%${byte.toString(16).padStart(2, '0').toUpperCase()}`)
         .join('');
