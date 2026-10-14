@@ -81,6 +81,16 @@
     return `CZ${checkDigits}${bban}`;
   }
 
+  // SPAYD values use URL encoding for characters outside the compact QR alphabet.
+  // In particular, '*' must be escaped because it separates the fields.
+  function encodeSpaydValue(value) {
+    const allowed = new Set('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 $+-./:');
+    return [...new TextEncoder().encode(value)].map(byte => {
+      const char = String.fromCharCode(byte);
+      return byte < 128 && allowed.has(char) ? char : `%${byte.toString(16).padStart(2, '0').toUpperCase()}`;
+    }).join('');
+  }
+
   function buildPayload() {
     switch (modeSelect.value) {
       case 'url': {
@@ -123,11 +133,21 @@
         if (!Number.isFinite(amount) || amount < 0.01 || amount > 9999999.99 || Math.round(amount * 100) !== amount * 100) {
           fail('Částka musí být od 0,01 do 9 999 999,99 Kč a nejvýše na dvě desetinná místa.', amountField);
         }
+        const messageField = document.querySelector('#pay-message');
+        const recipientField = document.querySelector('#pay-recipient');
+        const message = messageField.value.trim();
+        const recipient = recipientField.value.trim();
         const vs = document.querySelector('#pay-vs').value.trim();
+        if ([...message].length > 60) fail('Zpráva pro příjemce může mít nejvýše 60 znaků.', messageField);
+        if ([...recipient].length > 35) fail('Jméno příjemce může mít nejvýše 35 znaků.', recipientField);
         if (vs && !/^\d{1,10}$/.test(vs)) fail('Variabilní symbol může mít nejvýše 10 číslic.', document.querySelector('#pay-vs'));
         // QR Platba / SPAYD: required account plus explicit CZK amount and currency.
-        // Keep the interoperable field order used in the official QR Platba examples.
-        return `SPD*1.0*ACC:${iban}*AM:${amount.toFixed(2)}*CC:CZK${vs ? `*X-VS:${vs}` : ''}`;
+        // Keep ACC, AM, CC, MSG, RN and X-VS in the requested interoperable order.
+        const fields = [`ACC:${iban}`, `AM:${amount.toFixed(2)}`, 'CC:CZK'];
+        if (message) fields.push(`MSG:${encodeSpaydValue(message)}`);
+        if (recipient) fields.push(`RN:${encodeSpaydValue(recipient)}`);
+        if (vs) fields.push(`X-VS:${vs}`);
+        return `SPD*1.0*${fields.join('*')}`;
       }
       default:
         fail('Vybraný typ QR kódu není podporován.');
