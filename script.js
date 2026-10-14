@@ -18,6 +18,7 @@
     { id: 'demo-4', name: 'Moodboard', description: 'Barvy, tvary a inspirace.', url: 'https://example.com', category: 'design', favorite: false },
     { id: 'demo-5', name: 'Study Tracker', description: 'Každý den o kousek dál.', url: 'https://example.com', category: 'web', favorite: false },
     { id: 'demo-6', name: 'Tiny Tools', description: 'Malé nástroje pro každý den.', url: 'https://example.com', category: 'code', favorite: true },
+    { id: 'qr-maker', name: 'QR maker', description: 'Lokální generátor QR kódů pro odkazy, zprávy i platby.', url: 'QR_maker/index.html', category: 'web', favorite: false, builtin: true },
   ];
 
   const grid = document.querySelector('#project-grid');
