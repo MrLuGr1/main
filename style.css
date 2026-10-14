@@ -127,6 +127,24 @@ body[data-admin-mode="true"] .project-card:hover .card-category{visibility:hidde
 .admin-only[hidden]{display:none!important}
 body[data-admin-mode="true"] .project-card .card-delete{display:block}
 body[data-admin-mode="true"] .project-card .card-category{visibility:hidden}
+.card-actions{position:absolute;right:8px;bottom:7px;z-index:2;display:none;align-items:center;gap:4px}
+.project-card:hover .card-actions,body[data-admin-mode="true"] .project-card .card-actions{display:flex}
+.card-actions .card-edit,.card-actions .card-delete{position:static;display:inline-flex;align-items:center;gap:3px;border:1px solid #e2dff5;background:#f8f7ff;color:#6254be;font:9px var(--mono);padding:5px 6px;cursor:pointer;box-shadow:1px 1px 0 #e1dff0}
+.card-actions .card-delete{border-color:#f0dada;background:#fff7f7;color:#ad6262}
+.card-actions button:hover{filter:brightness(.96);transform:translateY(-1px)}
+.card-icon img,.project-icon img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated}
+.favicon-row{display:flex;align-items:center;gap:9px;margin-top:9px;min-height:33px}
+.favicon-preview{display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;border:1px solid #e3e0f3;background:#f4f2fe;font-size:17px}
+.favicon-preview img{width:24px;height:24px;object-fit:contain;image-rendering:pixelated}
+.favicon-button{height:30px;padding:0 8px;white-space:nowrap;font-size:10px}
+.favicon-button:disabled{opacity:.6;cursor:wait}
+.favicon-status{font-size:9px;line-height:1.35;color:#8b96a6}
+:root[data-theme="dark"] .card-actions .card-edit{background:#302d48;border-color:#484267;color:#d1caff;box-shadow:1px 1px 0 #171e2b}
+:root[data-theme="dark"] .card-actions .card-delete{background:#3b2b34;border-color:#59404b;color:#f0b7be}
+:root[data-theme="dark"] .favicon-preview{background:#302d48;border-color:#484267}
+:root[data-theme="dark"] .favicon-status{color:#b1bdd0}
+.save-button #save-project-label{font:inherit}
+@media(max-width:510px){.card-actions{right:5px;bottom:5px;gap:2px}.card-actions .card-edit,.card-actions .card-delete{font-size:8px;padding:4px}.favicon-row{gap:6px;flex-wrap:wrap}.favicon-status{flex-basis:100%;margin-left:38px}}
 .admin-dialog{width:min(400px,calc(100vw - 28px))}
 .admin-security-note{margin:0 0 14px;padding:8px 10px;border-left:2px solid #e4b858;background:#fff9e9;color:#85734c;font-size:10px;line-height:1.45}
 .admin-login-status{min-height:18px;margin:9px 0 0;color:#c06068;font-size:11px;line-height:1.45}
