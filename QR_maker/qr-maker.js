@@ -36,6 +36,36 @@
     throw new Error(message);
   }
 
+  // Keep qrcode.js away from raw control bytes and malformed UTF-16 surrogates.
+  // Controls are represented visibly as ASCII escapes so scanners retain readable data.
+  function makeQrSafe(value) {
+    let safe = '';
+    for (let index = 0; index < value.length; index++) {
+      const code = value.charCodeAt(index);
+      if (code >= 0xd800 && code <= 0xdbff) {
+        const next = value.charCodeAt(index + 1);
+        if (next >= 0xdc00 && next <= 0xdfff) {
+          safe += value[index] + value[index + 1];
+          index++;
+        } else {
+          safe += '\ufffd';
+        }
+      } else if (code >= 0xdc00 && code <= 0xdfff) {
+        safe += '\ufffd';
+      } else if (code < 0x20 || code === 0x7f) {
+        safe += `\\x${code.toString(16).padStart(2, '0')}`;
+      } else {
+        safe += value[index];
+      }
+    }
+    return safe;
+  }
+
+  function encodeMailValue(value) {
+    // mailto query fields use form-style encoding: spaces become + and literal + becomes %2B.
+    return encodeURIComponent(value).replaceAll('%20', '+');
+  }
+
   function createCzechIban(accountInput, bankCode) {
     const account = accountInput.trim().replaceAll(' ', '');
     const match = account.match(/^(?:(\d{1,6})-)?(\d{1,10})$/);
@@ -65,25 +95,25 @@
       case 'email': {
         const address = document.querySelector('#email-address').value.trim();
         if (!address) fail('Zadej e-mailovou adresu.', document.querySelector('#email-address'));
-        const params = new URLSearchParams();
         const subject = document.querySelector('#email-subject').value.trim();
         const body = document.querySelector('#email-body').value;
-        if (subject) params.set('subject', subject);
-        if (body) params.set('body', body);
-        return `mailto:${address}${params.size ? `?${params.toString()}` : ''}`;
+        const params = [];
+        if (subject) params.push(`subject=${encodeMailValue(subject)}`);
+        if (body) params.push(`body=${encodeMailValue(body)}`);
+        return `mailto:${address}${params.length ? `?${params.join('&')}` : ''}`;
       }
       case 'sms': {
         let prefix = countrySelect.value === 'custom' ? customCountry.value.trim() : countrySelect.value;
         if (!/^\+\d{1,4}$/.test(prefix)) fail('Zadej předvolbu ve formátu +420.', customCountry);
         const phone = document.querySelector('#sms-phone').value.replace(/[\s()-]/g, '');
         if (!/^\d{3,15}$/.test(phone)) fail('Telefonní číslo zadej jako 3 až 15 číslic.', document.querySelector('#sms-phone'));
-        const text = document.querySelector('#sms-body').value.trim();
-        return `smsto:${prefix}${phone}${text ? `:${encodeURIComponent(text)}` : ''}`;
+        const text = document.querySelector('#sms-body').value;
+        return `sms:${prefix}${phone}${text ? `?body=${encodeURIComponent(text)}` : ''}`;
       }
       case 'text': {
         const value = document.querySelector('#plain-text').value;
         if (!value.trim()) fail('Zadej text, který chceš do QR kódu uložit.', document.querySelector('#plain-text'));
-        return value;
+        return makeQrSafe(value);
       }
       case 'payment': {
         const bankCode = bankSelect.value === 'other' ? customBank.value.trim() : bankSelect.value;
@@ -95,6 +125,8 @@
         }
         const vs = document.querySelector('#pay-vs').value.trim();
         if (vs && !/^\d{1,10}$/.test(vs)) fail('Variabilní symbol může mít nejvýše 10 číslic.', document.querySelector('#pay-vs'));
+        // QR Platba / SPAYD: required account plus explicit CZK amount and currency.
+        // Keep the interoperable field order used in the official QR Platba examples.
         return `SPD*1.0*ACC:${iban}*AM:${amount.toFixed(2)}*CC:CZK${vs ? `*X-VS:${vs}` : ''}`;
       }
       default:
@@ -104,16 +136,28 @@
 
   function renderQr(value) {
     if (!window.QRCode) fail('Knihovnu pro QR kódy se nepodařilo načíst. Obnov stránku a zkus to znovu.');
+    value = makeQrSafe(value);
     output.replaceChildren();
     download.hidden = true;
-    new QRCode(output, {
-      text: value,
-      width: 280,
-      height: 280,
-      colorDark: '#101820',
-      colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M,
-    });
+    placeholder.hidden = true;
+    try {
+      new QRCode(output, {
+        text: value,
+        width: 280,
+        height: 280,
+        colorDark: '#101820',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+    } catch (error) {
+      output.replaceChildren();
+      placeholder.hidden = false;
+      payloadView.textContent = 'Zatím žádný kód.';
+      if (/too long data/i.test(error.message || '')) {
+        fail('Text je pro jeden QR kód příliš dlouhý. Zkrať ho a zkus generování znovu.');
+      }
+      fail(`QR kód se nepodařilo vytvořit: ${error.message || 'neznámá chyba knihovny'}`);
+    }
     const canvas = output.querySelector('canvas');
     const image = output.querySelector('img');
     const imageUrl = canvas?.toDataURL('image/png') || image?.src;
@@ -121,7 +165,6 @@
     download.href = imageUrl;
     download.download = `qr-${modeSelect.value}.png`;
     download.hidden = false;
-    placeholder.hidden = true;
     payloadView.textContent = value;
     status.textContent = 'QR kód je připraven. Generování proběhlo lokálně.';
   }
