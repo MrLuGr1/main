@@ -18,8 +18,13 @@
     { id: 'demo-4', name: 'Moodboard', description: 'Barvy, tvary a inspirace.', url: 'https://example.com', category: 'design', favorite: false },
     { id: 'demo-5', name: 'Study Tracker', description: 'Každý den o kousek dál.', url: 'https://example.com', category: 'web', favorite: false },
     { id: 'demo-6', name: 'Tiny Tools', description: 'Malé nástroje pro každý den.', url: 'https://example.com', category: 'code', favorite: true },
-    { id: 'qr-maker', name: 'QR maker', description: 'Lokální generátor QR kódů pro odkazy, zprávy i platby.', url: 'QR_maker/index.html', category: 'web', favorite: false, builtin: true },
   ];
+  // Offline fallback only; the shared projects.json remains authoritative when the API is available.
+  const qrMakerFallback = { id: 'qr-maker', name: 'QR maker', description: 'Lokální generátor QR kódů pro odkazy, zprávy i platby.', url: 'QR_maker/index.html', category: 'web', favorite: false };
+
+  function withQrMakerFallback(list) {
+    return list.some(project => project.id === qrMakerFallback.id) ? list : [...list, qrMakerFallback];
+  }
 
   const grid = document.querySelector('#project-grid');
   const search = document.querySelector('#search');
@@ -43,16 +48,14 @@
           if (retained.length !== projects.length) {
             try { localStorage.setItem(STORAGE_KEY, JSON.stringify(retained)); } catch { /* The visible list is still cleaned for this session. */ }
           }
-          const builtins = new Map(starterProjects.filter(project => project.builtin).map(project => [project.id, project]));
-          const valid = retained.filter(isValidProject).map(project => builtins.has(project.id) ? { ...project, ...builtins.get(project.id) } : project);
-          const ids = new Set(valid.map(project => project.id));
-          return [...valid, ...starterProjects.filter(project => project.builtin && !ids.has(project.id))];
+          const valid = retained.filter(isValidProject);
+          return withQrMakerFallback([...valid, ...starterProjects.filter(project => !valid.some(savedProject => savedProject.id === project.id))]);
         }
       }
     } catch (error) {
       console.warn('Projekty se nepodařilo načíst z localStorage.', error);
     }
-    return starterProjects;
+    return withQrMakerFallback(starterProjects);
   }
 
   function isValidProject(project) {
@@ -93,6 +96,8 @@
       render();
     } catch (error) {
       console.warn('Sdílené projekty se nepodařilo načíst.', error);
+      projects = withQrMakerFallback(projects);
+      render();
       showToast('Sdílený seznam není dostupný; zobrazuji místní kopii.');
     }
   }
