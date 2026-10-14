@@ -86,6 +86,10 @@
           <input class="qr-input" id="pay-bank-custom" type="text" inputmode="numeric" maxlength="4" placeholder="Čtyřmístný kód banky" aria-label="Vlastní kód banky" hidden disabled>
           <label class="qr-label" for="pay-amount">ČÁSTKA V CZK</label>
           <input class="qr-input" id="pay-amount" type="number" min="0.01" max="9999999.99" step="0.01" placeholder="250.00" required>
+          <label class="qr-label" for="pay-message">ZPRÁVA PRO PŘÍJEMCE <span>(VOLITELNÁ · MAX. 60 ZNAKŮ)</span></label>
+          <input class="qr-input" id="pay-message" type="text" maxlength="60" placeholder="Např. Platba za objednávku">
+          <label class="qr-label" for="pay-recipient">JMÉNO PŘÍJEMCE <span>(VOLITELNÉ · MAX. 35 ZNAKŮ)</span></label>
+          <input class="qr-input" id="pay-recipient" type="text" maxlength="35" placeholder="Např. Jan Novák">
           <label class="qr-label" for="pay-vs">VARIABILNÍ SYMBOL <span>(VOLITELNÝ)</span></label>
           <input class="qr-input" id="pay-vs" type="text" inputmode="numeric" maxlength="10" placeholder="1234567890">
         </section>
