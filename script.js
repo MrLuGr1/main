@@ -5,25 +5,25 @@
   // This URL is public configuration, not a secret. Passwords and session tokens never go in source control.
   const API_BASE = (document.querySelector('meta[name="pixel-desk-api"]')?.content || '').trim().replace(/\/$/, '');
   const REMOVED_BUILTIN_IDS = new Set(['dos-tools-folder', 'dos-penetration-test', 'dos-request-spammer']);
+  const REMOVED_DEMO_IDS = new Set(['demo-1', 'demo-2', 'demo-3', 'demo-4', 'demo-5', 'demo-6']);
+  const REMOVED_DEMO_NAMES = new Set(['portfolio', 'portfolio 2025', 'pixel garden', 'weather app', 'moodboard', 'study tracker', 'study stracker', 'tiny tools']);
   const categoryInfo = {
     web: { label: 'Web & aplikace', icon: '🌐', iconClass: 'web' },
     design: { label: 'Design', icon: '🎨', iconClass: 'design' },
     code: { label: 'Vývoj', icon: '⌘', iconClass: 'code' },
     other: { label: 'Ostatní', icon: '🪴', iconClass: 'other' },
   };
-  const starterProjects = [
-    { id: 'demo-1', name: 'Portfolio 2025', description: 'Moje práce a malé experimenty.', url: 'https://example.com', category: 'design', favorite: true },
-    { id: 'demo-2', name: 'Pixel Garden', description: 'Místo, kde rostou nové nápady.', url: 'https://example.com', category: 'web', favorite: false },
-    { id: 'demo-3', name: 'Weather App', description: 'Počasí s trochou charakteru.', url: 'https://example.com', category: 'code', favorite: false },
-    { id: 'demo-4', name: 'Moodboard', description: 'Barvy, tvary a inspirace.', url: 'https://example.com', category: 'design', favorite: false },
-    { id: 'demo-5', name: 'Study Tracker', description: 'Každý den o kousek dál.', url: 'https://example.com', category: 'web', favorite: false },
-    { id: 'demo-6', name: 'Tiny Tools', description: 'Malé nástroje pro každý den.', url: 'https://example.com', category: 'code', favorite: true },
-  ];
+  const starterProjects = [];
   // Offline fallback only; the shared projects.json remains authoritative when the API is available.
   const qrMakerFallback = { id: 'qr-maker', name: 'QR maker', description: 'Lokální generátor QR kódů pro odkazy, zprávy i platby.', url: 'QR_maker/index.html', category: 'web', favorite: false };
 
   function withQrMakerFallback(list) {
     return list.some(project => project.id === qrMakerFallback.id) ? list : [...list, qrMakerFallback];
+  }
+
+  function isRemovedDemoProject(project) {
+    const normalizedName = typeof project?.name === 'string' ? project.name.trim().toLocaleLowerCase('cs') : '';
+    return REMOVED_DEMO_IDS.has(project?.id) || REMOVED_DEMO_NAMES.has(normalizedName);
   }
 
   const grid = document.querySelector('#project-grid');
@@ -44,7 +44,7 @@
       if (saved !== null) {
         const projects = JSON.parse(saved);
         if (Array.isArray(projects)) {
-          const retained = projects.filter(project => !REMOVED_BUILTIN_IDS.has(project?.id));
+          const retained = projects.filter(project => !REMOVED_BUILTIN_IDS.has(project?.id) && !isRemovedDemoProject(project));
           if (retained.length !== projects.length) {
             try { localStorage.setItem(STORAGE_KEY, JSON.stringify(retained)); } catch { /* The visible list is still cleaned for this session. */ }
           }
@@ -60,7 +60,7 @@
 
   function isValidProject(project) {
     return project && typeof project.id === 'string' && typeof project.name === 'string' &&
-      typeof project.url === 'string' && categoryInfo[project.category];
+      typeof project.url === 'string' && categoryInfo[project.category] && !isRemovedDemoProject(project);
   }
 
   let projects = readProjects();
