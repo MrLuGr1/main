@@ -52,7 +52,7 @@
         }
       } else if (code >= 0xdc00 && code <= 0xdfff) {
         safe += '\ufffd';
-      } else if (code < 0x20 || code === 0x7f) {
+      } else if (code < 0x20 || (code >= 0x7f && code <= 0x9f)) {
         safe += `\\x${code.toString(16).padStart(2, '0')}`;
       } else {
         safe += value[index];
@@ -62,8 +62,8 @@
   }
 
   function encodeMailValue(value) {
-    // mailto query fields use form-style encoding: spaces become + and literal + becomes %2B.
-    return encodeURIComponent(value).replaceAll('%20', '+');
+    // RFC 6068 mailto fields use percent encoding, so spaces remain %20.
+    return encodeURIComponent(value);
   }
 
   function createCzechIban(accountInput, bankCode) {
@@ -147,7 +147,8 @@
         height: 280,
         colorDark: '#101820',
         colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.M,
+        // M is the QR Platba recommendation; L leaves more room for long ordinary text.
+        correctLevel: modeSelect.value === 'payment' ? QRCode.CorrectLevel.M : QRCode.CorrectLevel.L,
       });
     } catch (error) {
       output.replaceChildren();
