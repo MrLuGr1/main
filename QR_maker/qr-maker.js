@@ -11,6 +11,7 @@
   const payloadView = document.querySelector('#qr-payload');
   const bankSelect = document.querySelector('#pay-bank');
   const customBank = document.querySelector('#pay-bank-custom');
+  const currencySelect = document.querySelector('#pay-currency');
   const variableSymbol = document.querySelector('#pay-vs');
   const countrySelect = document.querySelector('#sms-country');
   const customCountry = document.querySelector('#sms-custom-country');
@@ -136,9 +137,13 @@
         const bankCode = bankSelect.value === 'other' ? customBank.value.trim() : bankSelect.value;
         const iban = createCzechIban(document.querySelector('#pay-account').value, bankCode);
         const amountField = document.querySelector('#pay-amount');
-        const amount = Number(amountField.value);
-        if (!Number.isFinite(amount) || amount < 0.01 || amount > 9999999.99 || Math.round(amount * 100) !== amount * 100) {
-          fail('Částka musí být od 0,01 do 9 999 999,99 Kč a nejvýše na dvě desetinná místa.', amountField);
+        const amountInput = amountField.value.trim();
+        let amount = null;
+        if (amountInput) {
+          amount = Number(amountInput);
+          if (!Number.isFinite(amount) || amount < 0.01 || amount > 9999999.99 || Math.round(amount * 100) !== amount * 100) {
+            fail('Částka musí být od 0,01 do 9 999 999,99 a nejvýše na dvě desetinná místa.', amountField);
+          }
         }
         const messageField = document.querySelector('#pay-message');
         const recipientField = document.querySelector('#pay-recipient');
@@ -148,9 +153,10 @@
         if ([...message].length > 60) fail('Zpráva pro příjemce může mít nejvýše 60 znaků.', messageField);
         if ([...recipient].length > 35) fail('Jméno příjemce může mít nejvýše 35 znaků.', recipientField);
         if (vs && !/^\d{1,10}$/.test(vs)) fail('Variabilní symbol může obsahovat pouze 1 až 10 číslic.', variableSymbol);
-        // QR Platba / SPAYD: required account plus explicit CZK amount and currency.
-        // Keep ACC, AM, CC, MSG, RN and X-VS in the requested interoperable order.
-        const fields = [`ACC:${iban}`, `AM:${amount.toFixed(2)}`, 'CC:CZK'];
+        // AM is optional in SPAYD; ACC and the selected currency remain present.
+        const fields = [`ACC:${iban}`];
+        if (amount !== null) fields.push(`AM:${amount.toFixed(2)}`);
+        fields.push(`CC:${currencySelect.value}`);
         if (message) fields.push(`MSG:${encodeSpaydValue(message)}`);
         if (recipient) fields.push(`RN:${encodeSpaydValue(recipient)}`);
         if (vs) fields.push(`X-VS:${vs}`);
