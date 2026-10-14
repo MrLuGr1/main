@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 2223)
-Total output lines: 124
-
 <!doctype html>
 <html lang="cs">
 <head>
@@ -10,10 +7,10 @@ Total output lines: 124
   <script>try{if(localStorage.getItem('pixel-desk-theme-v1')==='dark')document.documentElement.dataset.theme='dark'}catch{}</script>
   <title>QR maker — Pixel Desk</title>
   <!-- Zvyš verzi ?v= při každém vydání frontendových souborů; běžné obnovení tak stáhne novou kopii. -->
-  <link rel="stylesheet" href="../style.css?v=20261014-6">
-  <link rel="stylesheet" href="qr-maker.css?v=20261014-6">
-  <script src="qrcode.min.js?v=20261014-6" defer></script>
-  <script src="qr-maker.js?v=20261014-6" defer></script>
+  <link rel="stylesheet" href="../style.css?v=20261014-7">
+  <link rel="stylesheet" href="qr-maker.css?v=20261014-7">
+  <script src="qrcode.min.js?v=20261014-7" defer></script>
+  <script src="qr-maker.js?v=20261014-7" defer></script>
 </head>
 <body>
   <main class="qr-shell">
@@ -66,7 +63,18 @@ Total output lines: 124
           <input class="qr-input" id="sms-custom-country" type="text" inputmode="tel" maxlength="5" placeholder="Např. +44" aria-label="Vlastní mezinárodní předvolba" hidden disabled>
           <label class="qr-label" for="sms-phone">TELEFONNÍ ČÍSLO</label>
           <input class="qr-input" id="sms-phone" type="tel" inputmode="tel" maxlength="20" placeholder="777 123 456" required>
-    …223 tokens truncated… platební formát SPAYD.</p>
+          <label class="qr-label" for="sms-body">TEXT ZPRÁVY</label>
+          <textarea class="qr-input qr-textarea" id="sms-body" maxlength="500" rows="3" placeholder="Text předvyplněné SMS"></textarea>
+        </section>
+
+        <section class="qr-fields" data-mode-panel="text" hidden>
+          <label class="qr-label" for="plain-text">TEXT NEBO DATA</label>
+          <textarea class="qr-input qr-textarea" id="plain-text" maxlength="2500" rows="7" placeholder="Napiš libovolný text…" required></textarea>
+        </section>
+
+        <section class="qr-fields" data-mode-panel="payment" hidden>
+          <p class="qr-warning" role="note">⚠ Upozornění: Generátor plateb je v testovacím režimu, vše nemusí fungovat správně.</p>
+          <p class="qr-help">Účet zadej jako <code>číslo</code> nebo <code>předčíslí-číslo</code>. QR obsahuje standardní český platební formát SPAYD.</p>
           <label class="qr-label" for="pay-account">ČÍSLO ÚČTU</label>
           <input class="qr-input" id="pay-account" type="text" inputmode="numeric" maxlength="17" placeholder="19-2000145399" required>
           <label class="qr-label" for="pay-bank">BANKA / KÓD BANKY</label>
