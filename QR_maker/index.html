@@ -7,10 +7,10 @@
   <script>try{if(localStorage.getItem('pixel-desk-theme-v1')==='dark')document.documentElement.dataset.theme='dark'}catch{}</script>
   <title>QR maker — Pixel Desk</title>
   <!-- Zvyš verzi ?v= při každém vydání frontendových souborů; běžné obnovení tak stáhne novou kopii. -->
-  <link rel="stylesheet" href="../style.css?v=20261014-4">
-  <link rel="stylesheet" href="qr-maker.css?v=20261014-4">
-  <script src="qrcode.min.js?v=20261014-4" defer></script>
-  <script src="qr-maker.js?v=20261014-4" defer></script>
+  <link rel="stylesheet" href="../style.css?v=20261014-5">
+  <link rel="stylesheet" href="qr-maker.css?v=20261014-5">
+  <script src="qrcode.min.js?v=20261014-5" defer></script>
+  <script src="qr-maker.js?v=20261014-5" defer></script>
 </head>
 <body>
   <main class="qr-shell">
@@ -73,6 +73,7 @@
         </section>
 
         <section class="qr-fields" data-mode-panel="payment" hidden>
+          <p class="qr-warning" role="note">⚠ Upozornění: Generátor plateb je v testovacím režimu, vše nemusí fungovat správně.</p>
           <p class="qr-help">Účet zadej jako <code>číslo</code> nebo <code>předčíslí-číslo</code>. QR obsahuje standardní český platební formát SPAYD.</p>
           <label class="qr-label" for="pay-account">ČÍSLO ÚČTU</label>
           <input class="qr-input" id="pay-account" type="text" inputmode="numeric" maxlength="17" placeholder="19-2000145399" required>
@@ -85,8 +86,16 @@
             <option value="other">Jiný kód…</option>
           </select>
           <input class="qr-input" id="pay-bank-custom" type="text" inputmode="numeric" maxlength="4" placeholder="Čtyřmístný kód banky" aria-label="Vlastní kód banky" hidden disabled>
-          <label class="qr-label" for="pay-amount">ČÁSTKA V CZK</label>
-          <input class="qr-input" id="pay-amount" type="number" min="0.01" max="9999999.99" step="0.01" placeholder="250.00" required>
+          <label class="qr-label" for="pay-currency">MĚNA PLATBY</label>
+          <select class="qr-input" id="pay-currency" name="currency">
+            <option value="CZK" selected>CZK · Česká koruna</option>
+            <option value="EUR">EUR · Euro</option>
+            <option value="USD">USD · Americký dolar</option>
+            <option value="GBP">GBP · Britská libra</option>
+            <option value="PLN">PLN · Polský zlotý</option>
+          </select>
+          <label class="qr-label" for="pay-amount">ČÁSTKA <span>(VOLITELNÁ)</span></label>
+          <input class="qr-input" id="pay-amount" type="number" min="0.01" max="9999999.99" step="0.01" placeholder="250.00">
           <label class="qr-label" for="pay-message">ZPRÁVA PRO PŘÍJEMCE <span>(VOLITELNÁ · MAX. 60 ZNAKŮ)</span></label>
           <input class="qr-input" id="pay-message" type="text" maxlength="60" placeholder="Např. Platba za objednávku">
           <label class="qr-label" for="pay-recipient">JMÉNO PŘÍJEMCE <span>(VOLITELNÉ · MAX. 35 ZNAKŮ)</span></label>
