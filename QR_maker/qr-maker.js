@@ -11,6 +11,7 @@
   const payloadView = document.querySelector('#qr-payload');
   const bankSelect = document.querySelector('#pay-bank');
   const customBank = document.querySelector('#pay-bank-custom');
+  const variableSymbol = document.querySelector('#pay-vs');
   const countrySelect = document.querySelector('#sms-country');
   const customCountry = document.querySelector('#sms-custom-country');
 
@@ -81,13 +82,21 @@
     return `CZ${checkDigits}${bban}`;
   }
 
-  // SPAYD values use URL encoding for characters outside the compact QR alphabet.
-  // In particular, '*' must be escaped because it separates the fields.
+  // Keep UTF-8 letters as literal text, matching George's QR examples. The SPAYD
+  // format allows UTF-8 values; '*' must be escaped because it separates fields.
+  // Other ASCII characters outside the compact alphabet and control bytes are
+  // percent-encoded so that punctuation cannot alter the descriptor structure.
   function encodeSpaydValue(value) {
     const allowed = new Set('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 $+-./:');
-    return [...new TextEncoder().encode(value)].map(byte => {
-      const char = String.fromCharCode(byte);
-      return byte < 128 && allowed.has(char) ? char : `%${byte.toString(16).padStart(2, '0').toUpperCase()}`;
+    return [...value].map(char => {
+      if (char === '*') return '%2A';
+      if (char === '%') return '%25';
+      const codePoint = char.codePointAt(0);
+      if (codePoint > 0x7f && !(codePoint >= 0x80 && codePoint <= 0x9f)) return char;
+      if (allowed.has(char)) return char;
+      return [...new TextEncoder().encode(char)]
+        .map(byte => `%${byte.toString(16).padStart(2, '0').toUpperCase()}`)
+        .join('');
     }).join('');
   }
 
@@ -137,10 +146,10 @@
         const recipientField = document.querySelector('#pay-recipient');
         const message = messageField.value.trim();
         const recipient = recipientField.value.trim();
-        const vs = document.querySelector('#pay-vs').value.trim();
+        const vs = variableSymbol.value.trim();
         if ([...message].length > 60) fail('Zpráva pro příjemce může mít nejvýše 60 znaků.', messageField);
         if ([...recipient].length > 35) fail('Jméno příjemce může mít nejvýše 35 znaků.', recipientField);
-        if (vs && !/^\d{1,10}$/.test(vs)) fail('Variabilní symbol může mít nejvýše 10 číslic.', document.querySelector('#pay-vs'));
+        if (vs && !/^\d{1,10}$/.test(vs)) fail('Variabilní symbol může obsahovat pouze 1 až 10 číslic.', variableSymbol);
         // QR Platba / SPAYD: required account plus explicit CZK amount and currency.
         // Keep ACC, AM, CC, MSG, RN and X-VS in the requested interoperable order.
         const fields = [`ACC:${iban}`, `AM:${amount.toFixed(2)}`, 'CC:CZK'];
@@ -191,6 +200,11 @@
   }
 
   modeSelect.addEventListener('change', () => { setMode(); updateConditionalFields(); });
+  // Keep leading zeroes (VS is an identifier), while removing any non-digits as typed.
+  variableSymbol.addEventListener('input', () => {
+    const digitsOnly = variableSymbol.value.replace(/\D/g, '').slice(0, 10);
+    if (variableSymbol.value !== digitsOnly) variableSymbol.value = digitsOnly;
+  });
   bankSelect.addEventListener('change', updateConditionalFields);
   countrySelect.addEventListener('change', updateConditionalFields);
   form.addEventListener('submit', event => {
