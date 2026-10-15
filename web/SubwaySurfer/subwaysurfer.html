@@ -106,13 +106,25 @@
     function makeBuilding(x,z){
       const g=new THREE.Group(); g.position.set(x,0,z);
       const width=random(4.3,7), height=random(10,24), depth=random(7,13);
+      const windowMatrices=[[],[]],windowDummy=new THREE.Object3D();
       const shell=materials.building[Math.floor(Math.random()*materials.building.length)];
       cube(g,shell,0,height/2,-depth/2,width,height,depth);
       for(let y=2;y<height-1;y+=2.5){
         for(let wx=-width/2+.8;wx<width/2-.4;wx+=1.25){
-          if(Math.random()<.76) cube(g,Math.random()<.78?materials.window:materials.windowWarm,wx,y,-depth+.015,.34,.62,.045);
+          if(Math.random()<.76){
+            const tone=Math.random()<.18?1:0;
+            windowDummy.position.set(wx,y,-depth+.015);windowDummy.scale.set(.34,.62,.045);windowDummy.updateMatrix();
+            windowMatrices[tone].push(windowDummy.matrix.clone());
+          }
         }
       }
+      // Per-building instances keep the windows moving with their parent at low draw-call cost.
+      [materials.window,materials.windowWarm].forEach((material,tone)=>{
+        const matrices=windowMatrices[tone];if(!matrices.length)return;
+        const windows=new THREE.InstancedMesh(boxGeo,material,matrices.length);
+        matrices.forEach((matrix,index)=>windows.setMatrixAt(index,matrix));
+        windows.instanceMatrix.needsUpdate=true;g.add(windows);
+      });
       // Small animated-look signage built from emissive panels, no textures required.
       cube(g,Math.random()<.5?materials.pink:materials.cyan,0,height*.69,-depth-.08,width*.53,.13,.12);
       scene.add(g); scenery.push({group:g,kind:'building',x,z});
