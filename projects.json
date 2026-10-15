@@ -1,5 +1,13 @@
 [
   {
+    "id": "d2a8add6-04da-43f0-a61a-b9961e5afcc9",
+    "name": "Instagram profil",
+    "description": "",
+    "url": "https://www.instagram.com/mr.lugr_art/",
+    "category": "web",
+    "favorite": false
+  },
+  {
     "id": "qr-maker",
     "name": "QR maker",
     "description": "Lokální generátor QR kódů pro odkazy, zprávy i platby.",
@@ -8,12 +16,12 @@
     "favorite": false
   },
   {
-    "id": "f495fa42-b56a-4026-85f2-b3fbc8503b1b",
-    "name": "Instagram profil",
-    "description": "Sekundární instagram profil",
-    "url": "https://www.instagram.com/mr.lugr_art/",
+    "id": "subway-surfer",
+    "name": "Subway Surfer",
+    "description": "Originální 3D endless runner ve třech pruzích.",
+    "url": "SubwaySurfer/subwaysurfer.html",
     "category": "web",
-    "favorite": true,
-    "iconUrl": "https://www.google.com/s2/favicons?domain=www.instagram.com&sz=64"
+    "favorite": false
   }
 ]
+
