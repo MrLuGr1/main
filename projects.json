@@ -2,10 +2,11 @@
   {
     "id": "d2a8add6-04da-43f0-a61a-b9961e5afcc9",
     "name": "Instagram profil",
-    "description": "",
+    "description": "Sekundární osobní profil",
     "url": "https://www.instagram.com/mr.lugr_art/",
     "category": "web",
-    "favorite": false
+    "favorite": true,
+    "iconUrl": "https://www.google.com/s2/favicons?domain=www.instagram.com&sz=64"
   },
   {
     "id": "qr-maker",
@@ -24,4 +25,3 @@
     "favorite": false
   }
 ]
-
