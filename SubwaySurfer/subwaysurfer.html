@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#10182b">
+  <title>Lumen Run — a three-lane night sprint</title>
+  <style>
+    :root{color-scheme:dark;--ink:#e9f2ff;--muted:#9cacc6;--cyan:#75f2e3;--pink:#ff8fc7;--yellow:#ffd76b;--panel:#10192bdc;--line:#54718d}
+    *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#10182b;color:var(--ink);font-family:ui-monospace,"Cascadia Mono","Courier New",monospace;letter-spacing:.02em}button{font:inherit;color:inherit;touch-action:manipulation}
+    #game{position:fixed;inset:0;width:100%;height:100%;display:block;outline:none;touch-action:none}
+    .grain{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:.09;background-image:radial-gradient(#c5efff 0.6px,transparent .7px);background-size:5px 5px;mix-blend-mode:screen}
+    .hud{position:fixed;z-index:3;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));pointer-events:none}
+    .hud-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.brand{font-size:clamp(12px,1.6vw,16px);font-weight:900;letter-spacing:.16em;color:var(--cyan);text-shadow:3px 3px #23344b}.brand small{display:block;margin-top:5px;color:#d7e6f5;font-size:9px;letter-spacing:.13em}.readouts{display:flex;gap:8px}.readout{min-width:76px;padding:8px 11px 7px;border:1px solid #6d91aa66;background:var(--panel);box-shadow:3px 3px #0a1020a8;text-align:right}.readout span{display:block;color:#9eb3c9;font-size:9px;letter-spacing:.12em}.readout strong{display:block;margin-top:3px;font-size:clamp(15px,2vw,21px);font-variant-numeric:tabular-nums}.readout.coins strong{color:var(--yellow)}
+    .hud-bottom{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}.speed-panel{padding:8px 11px;border-left:3px solid var(--pink);background:#111a2bd9;box-shadow:3px 3px #0a1020a8}.speed-panel span{display:block;color:#aebbd0;font-size:9px;letter-spacing:.1em}.speed-panel strong{color:#fff;font-size:15px}.hint{color:#d6e4f4;background:#111a2bc7;padding:7px 9px;font-size:10px;text-align:right;line-height:1.65}
+    .overlay{position:fixed;z-index:5;inset:0;display:grid;place-items:center;padding:20px;background:#080e1bb8;backdrop-filter:blur(5px)}.overlay[hidden]{display:none}.panel{width:min(460px,100%);padding:clamp(22px,5vw,38px);border:1px solid #7ab2c9;background:linear-gradient(145deg,#17243aF2,#111a2df5);box-shadow:7px 7px #080e1b, inset 0 0 0 4px #1e3048;text-align:center}.eyebrow{margin:0 0 11px;color:var(--cyan);font-size:10px;font-weight:bold;letter-spacing:.2em}.panel h1{margin:0;color:white;font-size:clamp(34px,8vw,56px);line-height:.95;letter-spacing:-.08em;text-shadow:4px 4px #7655bd}.panel h1 em{color:var(--pink);font-style:normal}.panel h2{margin:0 0 9px;font-size:25px}.panel-copy{max-width:350px;margin:17px auto 21px;color:#bccade;font-size:13px;line-height:1.7}.keys{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:0 auto 21px;max-width:350px;text-align:left}.keys span{padding:8px;border:1px solid #40536d;background:#131e32;color:#d9e5f2;font-size:11px}.keys b{color:var(--yellow)}.primary,.secondary{min-height:45px;padding:0 18px;border:1px solid var(--cyan);background:var(--cyan);color:#10202a;font-weight:900;letter-spacing:.08em;cursor:pointer;box-shadow:4px 4px #376d79}.primary:hover,.secondary:hover{transform:translate(-1px,-1px);box-shadow:5px 5px #376d79}.secondary{border-color:#91a7c5;background:#253650;color:#eff6ff;box-shadow:4px 4px #101725}.panel-actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}.best-line{margin-top:17px;color:#aabbd0;font-size:11px}.best-line strong{color:var(--yellow)}.mobile-controls{display:none;position:fixed;z-index:4;bottom:max(74px,calc(env(safe-area-inset-bottom) + 70px));left:0;right:0;justify-content:space-between;padding:0 16px;pointer-events:none}.mobile-side,.mobile-actions{display:flex;gap:9px}.mobile-controls button{pointer-events:auto;width:52px;height:48px;border:1px solid #9ac5dc88;background:#10203bcc;color:#eaf6ff;font-size:18px;box-shadow:3px 3px #08101b88}.mobile-controls button:active{transform:translate(2px,2px);box-shadow:1px 1px #08101b}
+    .toast{position:fixed;z-index:6;left:50%;top:22%;transform:translate(-50%,-6px);padding:9px 13px;border:1px solid #ffa4ce;background:#241b38;color:#fff;font-size:12px;opacity:0;transition:.2s;pointer-events:none}.toast.show{opacity:1;transform:translate(-50%,0)}
+    @media(max-width:650px){.hud{padding:12px}.hud-top{gap:7px}.brand{font-size:11px}.brand small{font-size:8px}.readouts{gap:5px}.readout{min-width:59px;padding:7px 7px 6px}.readout span{font-size:8px}.readout strong{font-size:16px}.hint{display:none}.mobile-controls{display:flex}.hud-bottom{align-items:flex-end}.panel-copy{font-size:12px}.keys span{font-size:10px}}
+    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+  </style>
+</head>
+<body>
+  <canvas id="game" aria-label="Lumen Run 3D game canvas"></canvas><div class="grain" aria-hidden="true"></div>
+  <section class="hud" aria-label="Game status">
+    <div class="hud-top"><div class="brand">LUMEN RUN<small>METRO DISTRICT · SHIFT 07</small></div><div class="readouts"><div class="readout"><span>DISTANCE</span><strong id="score">000000</strong></div><div class="readout coins"><span>GLOW TOKENS</span><strong id="coins">0</strong></div><div class="readout"><span>RECORD</span><strong id="best">000000</strong></div></div></div>
+    <div class="hud-bottom"><div class="speed-panel"><span>RUN SPEED · <strong id="difficulty">EASY</strong></span><strong><b id="speed">12.0</b> m/s</strong></div><div class="hint">A / D or ← / →  MOVE LANES<br>W / SPACE  JUMP · S / ↓  SLIDE · P  PAUSE</div></div>
+  </section>
+  <nav class="mobile-controls" aria-label="Touch controls"><div class="mobile-side"><button type="button" data-action="left" aria-label="Move left">←</button><button type="button" data-action="right" aria-label="Move right">→</button></div><div class="mobile-actions"><button type="button" data-action="jump" aria-label="Jump">↑</button><button type="button" data-action="slide" aria-label="Slide">↓</button></div></nav>
+  <div class="overlay" id="overlay"><div class="panel"><p class="eyebrow">A LUMEN TRANSIT ARCADE ORIGINAL</p><h1 id="panel-title">LUMEN<br><em>RUN</em></h1><p class="panel-copy" id="panel-copy">Dash through the midnight metro district as Mica, a tiny signal courier. Dodge the track gear, vault the low barriers, slide beneath scanners and collect glow tokens.</p><div class="keys" id="keys"><span><b>← / A · → / D</b> Change lane</span><span><b>SPACE / W</b> Jump</span><span><b>↓ / S</b> Slide</span><span><b>P / ESC</b> Pause</span></div><div class="panel-actions"><button class="primary" id="main-action" type="button">START RUN　▶</button></div><div class="best-line" id="overlay-stats">BEST DISTANCE <strong>000000</strong></div></div></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+
+    // Lumen Run: lightweight original endless runner. All scenery is reusable geometry.
+    const canvas = document.querySelector('#game');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111a2d);
+    scene.fog = new THREE.FogExp2(0x111a2d, 0.0125);
+    const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 180);
+    camera.position.set(0, 6.2, 10.7);
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+
+    scene.add(new THREE.HemisphereLight(0xa9dcff, 0x20182f, 1.35));
+    const moon = new THREE.DirectionalLight(0xd2e6ff, 2.6);
+    moon.position.set(-8, 14, 8);
+    moon.castShadow = true;
+    moon.shadow.mapSize.set(1024, 1024);
+    moon.shadow.camera.left = -13; moon.shadow.camera.right = 13; moon.shadow.camera.top = 15; moon.shadow.camera.bottom = -12;
+    scene.add(moon);
+    const neonLight = new THREE.PointLight(0x43e8d6, 34, 23, 2);
+    neonLight.position.set(0, 5.8, -12); scene.add(neonLight);
+
+    const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: .77, metalness: .08, ...extra });
+    const materials = {
+      asphalt: mat(0x252c3c), sleepers: mat(0x34394a), rail: mat(0x95afbd, { metalness: .72, roughness: .3 }),
+      edge: mat(0x38475a), stripe: mat(0x4b6379, { emissive: 0x142433, emissiveIntensity: .45 }),
+      building: [0x28334a,0x352b49,0x263e4d,0x42334a].map(c=>mat(c)),
+      window: mat(0x82f7e3,{emissive:0x3ac6b5,emissiveIntensity:1.4}), windowWarm:mat(0xffbd73,{emissive:0xc66737,emissiveIntensity:.8}),
+      bark:mat(0x624d48), leaf:[0x366b67,0x4b7765,0x315c72].map(c=>mat(c)),
+      gold:mat(0xffcf5c,{emissive:0xb67c20,emissiveIntensity:.9,metalness:.35}),
+      white:mat(0xd8f3ff,{emissive:0x83c7e6,emissiveIntensity:.4}),
+      cyan:mat(0x5eefd9,{emissive:0x25d1c1,emissiveIntensity:1.1}),
+      pink:mat(0xf277b7,{emissive:0x9a2e72,emissiveIntensity:.65}),
+      obstacle:mat(0xc84c6b,{emissive:0x65182c,emissiveIntensity:.55}), crate:mat(0x936bd0,{emissive:0x32204b,emissiveIntensity:.38}),
+      dark:mat(0x192536),
+    };
+    const boxGeo = new THREE.BoxGeometry(1,1,1);
+    const cube = (parent, material, x,y,z,sx,sy,sz, cast=false) => {
+      const mesh=new THREE.Mesh(boxGeo,material); mesh.position.set(x,y,z); mesh.scale.set(sx,sy,sz); mesh.castShadow=cast; mesh.receiveShadow=true; parent.add(mesh); return mesh;
+    };
+    const cylinderGeo = new THREE.CylinderGeometry(.5,.5,1,8);
+    const ballGeo = new THREE.SphereGeometry(.5,8,6);
+    const LANES = [-2.2,0,2.2], TRACK_LENGTH=26, SEGMENTS=9, PLAYER_Z=0;
+    const trackSegments=[], scenery=[], active=[];
+    const random = (min,max)=>min+Math.random()*(max-min);
+
+    // Long repeating track pieces keep the environment seamless without unbounded growth.
+    function makeTrackSegment(i){
+      const g=new THREE.Group(); g.position.z=-i*TRACK_LENGTH; scene.add(g);
+      cube(g,materials.asphalt,0,-.22,-TRACK_LENGTH/2,9.4,.42,TRACK_LENGTH);
+      for(let lane=-1;lane<=1;lane++){
+        const x=lane*2.2;
+        for(const side of [-.62,.62]) cube(g,materials.rail,x+side,-.015,-TRACK_LENGTH/2,.09,.12,TRACK_LENGTH);
+      }
+      for(let z=-1;z>-TRACK_LENGTH;z-=2.6) cube(g,materials.sleepers,0,-.02,z,8.2,.08,.2);
+      for(const x of [-4.45,4.45]) cube(g,materials.edge,x,.02,-TRACK_LENGTH/2,.26,.13,TRACK_LENGTH);
+      for(const x of [-1.1,1.1]){
+        for(let j=0;j<3;j++) cube(g,materials.stripe,x,.008,-3-j*8,.035,.025,2.2);
+      }
+      // Platform edge lamps repeat with the track tiles.
+      for(const x of [-4.03,4.03]){
+        const lamp=cube(g,materials.cyan,x,.18,-TRACK_LENGTH/2,.12,.12,TRACK_LENGTH);
+        lamp.material=materials.cyan;
+      }
+      trackSegments.push(g);
+    }
+    for(let i=0;i<SEGMENTS;i++) makeTrackSegment(i);
+
+    // Reusable blocky buildings and angular trees give the line its own night-city identity.
+    function makeBuilding(x,z){
+      const g=new THREE.Group(); g.position.set(x,0,z);
+      const width=random(4.3,7), height=random(10,24), depth=random(7,13);
+      const windowMatrices=[[],[]],windowDummy=new THREE.Object3D();
+      const shell=materials.building[Math.floor(Math.random()*materials.building.length)];
+      cube(g,shell,0,height/2,-depth/2,width,height,depth);
+      for(let y=2;y<height-1;y+=2.5){
+        for(let wx=-width/2+.8;wx<width/2-.4;wx+=1.25){
+          if(Math.random()<.76){
+            const tone=Math.random()<.18?1:0;
+            windowDummy.position.set(wx,y,-depth+.015);windowDummy.scale.set(.34,.62,.045);windowDummy.updateMatrix();
+            windowMatrices[tone].push(windowDummy.matrix.clone());
+          }
+        }
+      }
+      // Per-building instances keep the windows moving with their parent at low draw-call cost.
+      [materials.window,materials.windowWarm].forEach((material,tone)=>{
+        const matrices=windowMatrices[tone];if(!matrices.length)return;
+        const windows=new THREE.InstancedMesh(boxGeo,material,matrices.length);
+        matrices.forEach((matrix,index)=>windows.setMatrixAt(index,matrix));
+        windows.instanceMatrix.needsUpdate=true;g.add(windows);
+      });
+      // Small animated-look signage built from emissive panels, no textures required.
+      cube(g,Math.random()<.5?materials.pink:materials.cyan,0,height*.69,-depth-.08,width*.53,.13,.12);
+      scene.add(g); scenery.push({group:g,kind:'building',x,z});
+    }
+    function makeTree(x,z){
+      const g=new THREE.Group(); g.position.set(x,0,z);
+      const h=random(2.5,4.2);
+      const trunk=new THREE.Mesh(cylinderGeo,materials.bark); trunk.position.y=h*.35; trunk.scale.set(.23,h*.7,.23); trunk.castShadow=true; g.add(trunk);
+      for(let i=0;i<4;i++){
+        const crown=new THREE.Mesh(ballGeo,materials.leaf[(Math.random()*materials.leaf.length)|0]);
+        crown.position.set(random(-.55,.55),h*.58+i*.28,random(-.45,.45)); crown.scale.set(random(.65,1),random(.58,.9),random(.62,.94)); crown.castShadow=true; g.add(crown);
+      }
+      cube(g,materials.cyan,0,.16,0,1.2,.08,1.2);
+      scene.add(g); scenery.push({group:g,kind:'tree',x,z});
+    }
+    for(let i=0;i<SEGMENTS;i++){
+      const z=-10-i*TRACK_LENGTH;
+      makeBuilding(random(-12,-8),z+random(-8,8)); makeBuilding(random(8,12),z+random(-8,8));
+      if(i%2===0){makeTree(random(-7,-5),z-7);makeTree(random(5,7),z-15);}
+    }
+
+    // Original runner mascot Mica: a compact signal courier with a luminous visor.
+    const runner=new THREE.Group(); scene.add(runner);
+    const avatar=new THREE.Group(); runner.add(avatar);
+    cube(avatar,materials.dark,0,1.05,0,.92,.88,.57,true);
+    cube(avatar,materials.cyan,0,1.45,-.3,.7,.22,.07,true);
+    cube(avatar,materials.crate,0,1.9,0,.76,.63,.61,true);
+    cube(avatar,materials.white,0,1.92,-.32,.58,.24,.08,true);
+    cube(avatar,materials.pink,-.19,1.92,-.38,.09,.08,.04);
+    cube(avatar,materials.pink,.19,1.92,-.38,.09,.08,.04);
+    for(const side of [-1,1]){
+      cube(avatar,materials.cyan,side*.53,1.1,0,.25,.66,.34,true);
+      cube(avatar,materials.dark,side*.22,.42,0,.25,.62,.32,true);
+      cube(avatar,materials.white,side*.22,.12,-.04,.34,.14,.42,true);
+    }
+    const shadowBlob=new THREE.Mesh(new THREE.CircleGeometry(.62,12),new THREE.MeshBasicMaterial({color:0x070d17,transparent:true,opacity:.35}));
+    shadowBlob.rotation.x=-Math.PI/2; shadowBlob.position.y=.015; scene.add(shadowBlob);
+    const state={mode:'ready',lane:1,x:0,vx:0,y:0,vy:0,grounded:true,slide:0,distance:0,coins:0,score:0,speed:12,nextWave:0,flash:0};
+    let best=0;try{best=Number(localStorage.getItem('lumen-run-best')||0);}catch{} if(!Number.isFinite(best)) best=0;
+    const ui={score:document.querySelector('#score'),coins:document.querySelector('#coins'),best:document.querySelector('#best'),speed:document.querySelector('#speed'),difficulty:document.querySelector('#difficulty'),overlay:document.querySelector('#overlay'),title:document.querySelector('#panel-title'),copy:document.querySelector('#panel-copy'),action:document.querySelector('#main-action'),keys:document.querySelector('#keys'),stats:document.querySelector('#overlay-stats'),toast:document.querySelector('#toast')};
+    const pad=(n)=>String(Math.max(0,Math.floor(n))).padStart(6,'0');
+    ui.best.textContent=pad(best);
+    ui.stats.innerHTML=`BEST DISTANCE <strong>${pad(best)}</strong>`;
+    const clock=new THREE.Clock();
+
+    function showToast(message){ui.toast.textContent=message;ui.toast.classList.add('show');setTimeout(()=>ui.toast.classList.remove('show'),850);}
+    function setOverlay(mode){
+      state.mode=mode;
+      if(mode==='playing'){ui.overlay.hidden=true;return;}
+      ui.overlay.hidden=false;
+      if(mode==='ready'){
+        ui.title.innerHTML='LUMEN<br><em>RUN</em>'; ui.copy.textContent='Dash through the midnight metro district as Mica, a tiny signal courier. Dodge track gear, vault low barriers, slide beneath scanners and collect glow tokens.';
+        ui.keys.hidden=false;ui.action.textContent='START RUN　▶';ui.stats.innerHTML=`BEST DISTANCE <strong>${pad(best)}</strong>`;
+      }else if(mode==='paused'){
+        ui.title.innerHTML='RUN<br><em>PAUSED</em>';ui.copy.textContent='Take a breath. The metro can wait.';ui.keys.hidden=false;ui.action.textContent='RESUME　▶';ui.stats.innerHTML=`DISTANCE <strong>${pad(state.score)}</strong>　·　TOKENS <strong>${state.coins}</strong>`;
+      }else if(mode==='over'){
+        ui.title.innerHTML='SHIFT<br><em>OVER</em>';ui.copy.textContent='Mica lost the signal. Ready for another run?';ui.keys.hidden=true;ui.action.textContent='RUN AGAIN　↻';ui.stats.innerHTML=`DISTANCE <strong>${pad(state.score)}</strong>　·　TOKENS <strong>${state.coins}</strong><br><br>BEST <strong>${pad(best)}</strong>`;
+      }
+    }
+    function resetRun(){
+      for(const item of active) scene.remove(item.group); active.length=0;
+      state.lane=1;state.x=0;state.vx=0;state.y=0;state.vy=0;state.grounded=true;state.slide=0;state.distance=0;state.coins=0;state.score=0;state.speed=12;state.nextWave=0;state.flash=0;
+      for(const segment of trackSegments) segment.position.z=-trackSegments.indexOf(segment)*TRACK_LENGTH;
+      runner.position.set(0,0,PLAYER_Z); avatar.scale.y=1;
+      // Move the nearer scenery back to its original loop span.
+      scenery.forEach(item=>{item.group.position.z=item.z;});
+    }
+    function startRun(){resetRun();setOverlay('playing');clock.getDelta();}
+    ui.action.addEventListener('click',()=>{if(state.mode==='paused')setOverlay('playing');else startRun();});
+
+    function laneMove(direction){if(state.mode!=='playing')return;state.lane=THREE.MathUtils.clamp(state.lane+direction,0,2);}
+    function jump(){if(state.mode!=='playing'||!state.grounded)return;state.slide=0;state.grounded=false;state.vy=9.4;}
+    function slide(){if(state.mode!=='playing'||!state.grounded)return;state.slide=.78;}
+    function pause(){if(state.mode==='playing')setOverlay('paused');else if(state.mode==='paused')setOverlay('playing');}
+    const keyActions={ArrowLeft:()=>laneMove(-1),KeyA:()=>laneMove(-1),ArrowRight:()=>laneMove(1),KeyD:()=>laneMove(1),ArrowUp:jump,KeyW:jump,Space:jump,ArrowDown:slide,KeyS:slide};
+    addEventListener('keydown',event=>{
+      if(event.code==='Escape'||event.code==='KeyP'){event.preventDefault();pause();return;}
+      if(keyActions[event.code]){event.preventDefault();if(!event.repeat)keyActions[event.code]();}
+      if(event.code==='Enter'&&state.mode!=='playing'){startRun();}
+    });
+    document.querySelectorAll('[data-action]').forEach(button=>button.addEventListener('click',()=>({left:()=>laneMove(-1),right:()=>laneMove(1),jump,slide}[button.dataset.action])()));
+    let pointerStart=null;
+    canvas.addEventListener('pointerdown',event=>{if(event.pointerType==='touch')pointerStart={x:event.clientX,y:event.clientY};});
+    canvas.addEventListener('pointerup',event=>{
+      if(!pointerStart)return;const dx=event.clientX-pointerStart.x,dy=event.clientY-pointerStart.y;pointerStart=null;
+      if(Math.max(Math.abs(dx),Math.abs(dy))<28)return;
+      if(Math.abs(dx)>Math.abs(dy))laneMove(dx<0?-1:1);else if(dy<0)jump();else slide();
+    });
+
+    // Obstacle waves always leave one whole lane open. Their order is randomized, never their solvability.
+    function makeHurdle(lane,z){
+      const g=new THREE.Group();g.position.set(LANES[lane],0,z);
+      cube(g,materials.obstacle,0,.48,0,1.38,.9,.8,true);
+      cube(g,materials.yellow||materials.gold,0,.92,-.02,1.42,.12,.84);
+      cube(g,materials.dark,-.42,.5,-.42,.12,.16,.05);cube(g,materials.dark,.42,.5,-.42,.12,.16,.05);
+      scene.add(g);return {kind:'hurdle',lane,group:g,hit:false};
+    }
+    function makeScanner(lane,z){
+      const g=new THREE.Group();g.position.set(LANES[lane],0,z);
+      cube(g,materials.pink,-.69,1.43,0,.16,2.86,.18,true);cube(g,materials.pink,.69,1.43,0,.16,2.86,.18,true);
+      cube(g,materials.pink,0,2.72,0,1.52,.22,.23,true);
+      cube(g,materials.cyan,0,2.58,-.02,.46,.08,.26);
+      scene.add(g);return {kind:'scanner',lane,group:g,hit:false};
+    }
+    function makeCargo(lane,z){
+      const g=new THREE.Group();g.position.set(LANES[lane],0,z);
+      cube(g,materials.crate,0,.9,0,1.62,1.8,1.5,true);
+      cube(g,materials.cyan,0,.92,-.77,1.12,.12,.08);
+      cube(g,materials.dark,0,.17,-.78,.48,.25,.08);
+      scene.add(g);return {kind:'cargo',lane,group:g,hit:false};
+    }
+    function makeCoin(lane,z){
+      const g=new THREE.Group();g.position.set(LANES[lane],.95,z);
+      const token=new THREE.Mesh(new THREE.CylinderGeometry(.37,.37,.12,10),materials.gold);token.rotation.x=Math.PI/2;token.castShadow=true;g.add(token);
+      const center=new THREE.Mesh(new THREE.BoxGeometry(.11,.11,.14),materials.white);g.add(center);
+      scene.add(g);return {kind:'coin',lane,group:g,hit:false,phase:Math.random()*6};
+    }
+    function spawnWave(){
+      const lanes=[0,1,2].sort(()=>Math.random()-.5);
+      const count=state.distance>420&&Math.random()<.58?2:1;
+      const blocked=lanes.slice(0,count);
+      for(const lane of blocked){
+        const roll=Math.random();
+        active.push(roll<.39?makeHurdle(lane,-82):roll<.72?makeScanner(lane,-82):makeCargo(lane,-82));
+      }
+      const safe=lanes[count];
+      // A short token trail through the guaranteed open lane teaches and rewards the safe route.
+      for(let i=0;i<5;i++)active.push(makeCoin(safe,-80-i*3.2));
+      state.nextWave=state.distance+Math.max(24,31-Math.min(6,state.distance/500));
+    }
+    function finishRun(){
+      state.mode='over';
+      if(state.score>best){best=state.score;try{localStorage.setItem('lumen-run-best',String(best));}catch{};ui.best.textContent=pad(best);}
+      setOverlay('over');
+    }
+
+    function update(dt,time){
+      if(state.mode==='playing'){
+        state.speed=12+Math.min(12,state.distance/170);
+        state.distance+=state.speed*dt;
+        state.score=Math.floor(state.distance*10)+state.coins*100;
+        if(state.distance>=state.nextWave)spawnWave();
+        const target=LANES[state.lane];
+        const accel=THREE.MathUtils.clamp((target-state.x)*25-state.vx*7,-44,44);
+        state.vx+=accel*dt;state.x+=state.vx*dt;
+        if(Math.abs(target-state.x)<.025&&Math.abs(state.vx)<.12){state.x=target;state.vx=0;}
+        if(!state.grounded){state.vy-=25*dt;state.y+=state.vy*dt;if(state.y<=0){state.y=0;state.vy=0;state.grounded=true;}}
+        if(state.slide>0)state.slide=Math.max(0,state.slide-dt);
+        runner.position.set(state.x,state.y,PLAYER_Z);
+        avatar.scale.y=state.slide>0?.48:1;
+        avatar.position.y=state.slide>0?.05:0;
+        const runBob=state.grounded&&state.slide<=0?Math.sin(time*15)*.035:0;
+        avatar.rotation.z=THREE.MathUtils.clamp(-state.vx*.025,-.12,.12);
+        avatar.rotation.x=runBob;
+        shadowBlob.position.x=state.x;shadowBlob.material.opacity=.36-Math.min(.2,state.y*.08);
+        for(const segment of trackSegments){segment.position.z+=state.speed*dt;if(segment.position.z>TRACK_LENGTH)segment.position.z-=SEGMENTS*TRACK_LENGTH;}
+        for(const item of scenery){item.group.position.z+=state.speed*dt;if(item.group.position.z>22)item.group.position.z-=SEGMENTS*TRACK_LENGTH;}
+        for(let i=active.length-1;i>=0;i--){
+          const item=active[i];item.group.position.z+=state.speed*dt;
+          if(item.kind==='coin'){
+            item.group.rotation.y=time*2.8+item.phase;item.group.position.y=.95+Math.sin(time*4+item.phase)*.1;
+            if(!item.hit&&Math.abs(item.group.position.z)<1.3&&Math.abs(state.x-LANES[item.lane])<.88&&state.y<1.8){
+              item.hit=true;scene.remove(item.group);state.coins++;showToast('+1 GLOW TOKEN');active.splice(i,1);continue;
+            }
+          }else if(!item.hit&&Math.abs(item.group.position.z)<1.25&&Math.abs(state.x-LANES[item.lane])<.82){
+            const survived=item.kind==='hurdle'&&state.y>.92;
+            const slid=item.kind==='scanner'&&state.slide>0;
+            if(!survived&&!slid){item.hit=true;finishRun();break;}
+          }
+          if(item.group.position.z>22){scene.remove(item.group);active.splice(i,1);}
+        }
+        ui.score.textContent=pad(state.score);ui.coins.textContent=String(state.coins);ui.speed.textContent=state.speed.toFixed(1);
+        ui.difficulty.textContent=state.distance<250?'EASY':state.distance<800?'FAST':'NIGHT SHIFT';
+      }
+      const camTargetX=state.x*.32;
+      camera.position.x+=(camTargetX-camera.position.x)*Math.min(1,dt*3.2);
+      camera.position.y=6.05+Math.sin(time*1.7)*.06+(state.mode==='playing'?Math.sin(state.distance*.14)*.04:0);
+      camera.position.z=10.7;
+      camera.lookAt(state.x*.16,1.12,-9.5);
+      neonLight.position.x=Math.sin(time*.4)*2.5;
+    }
+    function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.04),time=clock.elapsedTime;update(dt,time);renderer.render(scene,camera);}
+    addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setSize(innerWidth,innerHeight);});
+    addEventListener('contextmenu',event=>event.preventDefault());
+    animate();
+  </script>
+</body>
+</html>
+
