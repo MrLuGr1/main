@@ -27,7 +27,7 @@
           <div class="table-overlay-bottom"><span class="felt-label">FARKLE CLUB <i>✦</i> ROLL · SCORE · RISK</span><span id="throw-timer" class="throw-timer" aria-live="polite"></span></div>
           <div class="table-loading" id="table-loading"><span class="loading-die">⚄</span><span>Preparing the table…</span></div>
         </div>
-        <div class="table-legend"><span><i class="legend-dot ivory"></i> Your roll</span><span><i class="legend-dot guide"></i> Scoring guide (Easy)</span><span><i class="legend-dot gold"></i> Selected / kept</span><span class="legend-tip">Click dice to choose a valid scoring set</span></div>
+        <div class="table-legend"><span><i class="legend-dot ivory"></i> Your roll</span><span><i class="legend-dot guide"></i> Contrast guide (Easy)</span><span><i class="legend-dot selected"></i> Scoring selection</span><span class="legend-tip">Click dice to choose a valid scoring set</span></div>
       </section>
 
       <aside class="side-column">
@@ -77,6 +77,7 @@
         <label id="custom-target-wrap" hidden>CUSTOM · UP TO 100,000<input id="custom-target-score" type="number" min="1" max="100000" step="100" value="15000" inputmode="numeric"></label>
         <label>DIFFICULTY<select id="difficulty-select"><option value="easy">Easy · scoring guides on</option><option value="hard">Hard · no scoring guides</option></select></label>
         <label>DICE SKIN<select id="skin-select"><option value="basic">01 · Basic</option><option value="aurora">02 · Aurora</option><option value="lava">03 · Lava</option><option value="crt">04 · CRT</option><option value="pearl">05 · Pearl</option><option value="toxic">06 · Toxic</option><option value="grid">07 · Neon Grid</option><option value="ocean">08 · Deep Sea</option><option value="candy">09 · Candy</option><option value="void">10 · Void Pulse</option></select></label>
+        <label>THROW POWER<select id="throw-power-select"><option value="low">Low · gentle roll</option><option value="medium" selected>Medium · balanced</option><option value="high">High · strong throw</option></select></label>
       </div>
       <div class="lobby-best" id="lobby-best"><span>PERSONAL BEST</span><b id="lobby-best-value">0</b></div>
       <button class="lobby-start" id="lobby-action" type="button">SEAT THE TABLE <span>→</span></button>
