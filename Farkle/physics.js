@@ -4,7 +4,7 @@ import * as CANNON from 'https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cann
 const DIE_SIZE = .9;
 const HALF = DIE_SIZE / 2;
 const GRAVITY = 19;
-const KEEP_X = [-5.15, -3.1, -1.03, 1.03, 3.1, 5.15];
+const KEEP_X = [-3.85, -2.31, -.77, .77, 2.31, 3.85];
 
 function topFace(body) {
   const axes = [
@@ -66,15 +66,16 @@ export class DicePhysics {
       wall.addShape(new CANNON.Box(new CANNON.Vec3(halfX, .24, halfZ)));
       this.world.addBody(wall);
     };
-    addWall(-6.88, 0, .12, 4.9); addWall(6.88, 0, .12, 4.9);
-    addWall(0, -4.82, 6.9, .12); addWall(0, 4.82, 6.9, .12);
+    // Physical bounds match the 100 × 150 cm rectangular table in game.js.
+    addWall(-4.88, 0, .12, 7.35); addWall(4.88, 0, .12, 7.35);
+    addWall(0, -7.35, 4.9, .12); addWall(0, 7.35, 4.9, .12);
   }
 
   addDie(id) {
     const body = new CANNON.Body({
       mass: 0, type: CANNON.Body.STATIC, material: this.diceMaterial,
       shape: new CANNON.Box(new CANNON.Vec3(HALF, HALF, HALF)),
-      position: new CANNON.Vec3(KEEP_X[id], HALF, 3.35), allowSleep: true,
+      position: new CANNON.Vec3(KEEP_X[id], HALF, 5.45), allowSleep: true,
       sleepSpeedLimit: .08, sleepTimeLimit: .22, linearDamping: .22, angularDamping: .23,
     });
     body.dieId = id;
@@ -83,11 +84,11 @@ export class DicePhysics {
   }
 
   throwDice(ids) {
-    const positions = [-5.1, -3.06, -1.02, 1.02, 3.06, 5.1];
+    const positions = [-3.85, -2.31, -.77, .77, 2.31, 3.85];
     ids.forEach((id, index) => {
       const body = this.bodies[id];
       body.type = CANNON.Body.DYNAMIC; body.mass = 1; body.updateMassProperties(); body.wakeUp();
-      body.position.set(positions[index % positions.length], 2.5 + Math.random() * .65, Math.random() * 2.2 - 1.1);
+      body.position.set(positions[index % positions.length], 2.5 + Math.random() * .65, Math.random() * 4.6 - 2.3);
       body.quaternion.setFromEuler(Math.random() * 6, Math.random() * 6, Math.random() * 6);
       body.velocity.set((Math.random() - .5) * 4.5, 1 + Math.random() * 2.5, (Math.random() - .5) * 6.5);
       body.angularVelocity.set((Math.random() - .5) * 18, (Math.random() - .5) * 17, (Math.random() - .5) * 18);
@@ -137,7 +138,7 @@ export class DicePhysics {
   stashDie(id, rackIndex) {
     const body = this.bodies[id];
     body.type = CANNON.Body.STATIC; body.mass = 0; body.updateMassProperties();
-    body.position.set(KEEP_X[rackIndex % KEEP_X.length], HALF + .012, 3.35);
+    body.position.set(KEEP_X[rackIndex % KEEP_X.length], HALF + .012, 5.45);
     body.velocity.setZero(); body.angularVelocity.setZero(); body.force.setZero(); body.torque.setZero();
     body.aabbNeedsUpdate = true;
   }
