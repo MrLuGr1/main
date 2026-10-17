@@ -6,6 +6,7 @@ const HALF = DIE_SIZE / 2;
 const GRAVITY = 19;
 const KEEP_X = [-3.85, -2.31, -.77, .77, 2.31, 3.85];
 const THROW_POWER = { low: .62, medium: 1, high: 1.42 };
+const REST_GAP = 1.32;
 
 function topFace(body) {
   const axes = [
@@ -46,13 +47,16 @@ export class DicePhysics {
   constructor(count = 6) {
     this.world = new CANNON.World({ gravity: new CANNON.Vec3(0, -GRAVITY, 0), allowSleep: true });
     this.world.broadphase = new CANNON.NaiveBroadphase();
-    this.world.solver.iterations = 10;
+    this.world.solver.iterations = 16;
+    this.world.solver.tolerance = .001;
     this.diceMaterial = new CANNON.Material('ivory-dice');
     this.tableMaterial = new CANNON.Material('felt-table');
     this.world.defaultContactMaterial.friction = .38;
     this.world.defaultContactMaterial.restitution = .2;
     this.world.addContactMaterial(new CANNON.ContactMaterial(this.diceMaterial, this.tableMaterial, { friction: .48, restitution: .22 }));
+    this.world.addContactMaterial(new CANNON.ContactMaterial(this.diceMaterial, this.diceMaterial, { friction: .34, restitution: .08 }));
     this.bodies = [];
+    this.stashTransitions = new Map();
     this.roll = null;
     this.addTable();
     for (let i = 0; i < count; i++) this.addDie(i);
@@ -63,8 +67,9 @@ export class DicePhysics {
     ground.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
     this.world.addBody(ground);
     const addWall = (x, z, halfX, halfZ) => {
-      const wall = new CANNON.Body({ mass: 0, material: this.tableMaterial, position: new CANNON.Vec3(x, .22, z) });
-      wall.addShape(new CANNON.Box(new CANNON.Vec3(halfX, .24, halfZ)));
+      // Tall, thick walls stop even high-power throws from hopping over the board edge.
+      const wall = new CANNON.Body({ mass: 0, material: this.tableMaterial, position: new CANNON.Vec3(x, 2.9, z) });
+      wall.addShape(new CANNON.Box(new CANNON.Vec3(halfX, 3, halfZ)));
       this.world.addBody(wall);
     };
     // Physical bounds match the 100 × 150 cm rectangular table in game.js.
@@ -89,6 +94,7 @@ export class DicePhysics {
     const positions = [-3.85, -2.31, -.77, .77, 2.31, 3.85];
     ids.forEach((id, index) => {
       const body = this.bodies[id];
+      this.stashTransitions.delete(id);
       body.type = CANNON.Body.DYNAMIC; body.mass = 1; body.updateMassProperties(); body.wakeUp();
       body.position.set(positions[index % positions.length], 2.5 + Math.random() * .65, Math.random() * 4.6 - 2.3);
       body.quaternion.setFromEuler(Math.random() * 6, Math.random() * 6, Math.random() * 6);
@@ -101,28 +107,58 @@ export class DicePhysics {
     this.roll = { ids: [...ids], elapsed: 0, targets: null };
   }
 
+  /** Pick nearby, non-overlapping flat landing points for any dice that were stacked. */
+  resolveLandingPositions(ids) {
+    const active=new Set(ids);
+    // Reserve the rack positions of dice kept from previous rolls in this turn.
+    const occupied=this.bodies
+      .filter(body=>!active.has(body.dieId)&&body.type===CANNON.Body.STATIC)
+      .map(body=>({x:body.position.x,z:body.position.z}));
+    const resolved=new Map();
+    const xSlots=[];const zSlots=[];
+    for(let x=-4.05;x<=4.051;x+=REST_GAP)xSlots.push(x);
+    for(let z=-6.4;z<=6.401;z+=REST_GAP)zSlots.push(z);
+    const order=[...ids].sort((a,b)=>this.bodies[a].position.y-this.bodies[b].position.y);
+    for(const id of order){
+      const body=this.bodies[id];
+      const original={x:Math.max(-4.05,Math.min(4.05,body.position.x)),z:Math.max(-6.4,Math.min(6.4,body.position.z))};
+      const candidates=[original];
+      for(const x of xSlots)for(const z of zSlots)candidates.push({x,z});
+      candidates.sort((a,b)=>(a.x-original.x)**2+(a.z-original.z)**2-((b.x-original.x)**2+(b.z-original.z)**2));
+      const spot=candidates.find(candidate=>occupied.every(other=>Math.abs(candidate.x-other.x)>=REST_GAP||Math.abs(candidate.z-other.z)>=REST_GAP))||original;
+      occupied.push(spot);resolved.set(id,new CANNON.Vec3(spot.x,HALF+.012,spot.z));
+    }
+    return resolved;
+  }
+
   /** Advance the physical animation. Returns a face map once the two-second throw has settled. */
   step(delta) {
     if (!this.roll) return null;
     const remaining = Math.max(0, 2 - this.roll.elapsed);
     const step = Math.min(delta, remaining);
-    this.world.step(1 / 60, step, 4);
+    this.world.step(1 / 120, step, 12);
     this.roll.elapsed += step;
     if (this.roll.elapsed >= 1.68 && !this.roll.targets) {
+      const landing=this.resolveLandingPositions(this.roll.ids);
       this.roll.targets = new Map(this.roll.ids.map(id => {
         const body = this.bodies[id], face = topFace(body);
-        return [id, { face, quaternion: faceQuaternion(face) }];
+        return [id, { face, quaternion: faceQuaternion(face), position:landing.get(id), fromPosition:body.position.clone(), fromQuaternion:body.quaternion.clone() }];
       }));
     }
     if (this.roll.elapsed >= 1.68 && this.roll.targets) {
       const progress = Math.min(1, (this.roll.elapsed - 1.68) / .32);
-      const blend = Math.min(1, progress * progress * (3 - 2 * progress) * .44);
+      const blend = progress * progress * (3 - 2 * progress);
       for (const id of this.roll.ids) {
         const body = this.bodies[id], target = this.roll.targets.get(id);
+        body.quaternion.copy(target.fromQuaternion);
         blendQuaternion(body.quaternion, target.quaternion, blend);
-        body.velocity.scale(.72, body.velocity);
-        body.angularVelocity.scale(.68, body.angularVelocity);
-        body.position.y += (HALF + .012 - body.position.y) * Math.min(.35, progress * .12);
+        body.position.set(
+          target.fromPosition.x+(target.position.x-target.fromPosition.x)*blend,
+          target.fromPosition.y+(target.position.y-target.fromPosition.y)*blend,
+          target.fromPosition.z+(target.position.z-target.fromPosition.z)*blend,
+        );
+        body.velocity.scale(.55, body.velocity);
+        body.angularVelocity.scale(.45, body.angularVelocity);
         body.aabbNeedsUpdate = true;
       }
     }
@@ -131,7 +167,7 @@ export class DicePhysics {
     for (const id of this.roll.ids) {
       const body = this.bodies[id], target = this.roll.targets.get(id);
       faces.set(id, target.face);
-      body.position.y = HALF + .012; body.quaternion.copy(target.quaternion);
+      body.position.copy(target.position); body.quaternion.copy(target.quaternion);
       body.velocity.setZero(); body.angularVelocity.setZero(); body.force.setZero(); body.torque.setZero();
       body.aabbNeedsUpdate = true; body.sleep();
     }
@@ -142,9 +178,25 @@ export class DicePhysics {
   stashDie(id, rackIndex) {
     const body = this.bodies[id];
     body.type = CANNON.Body.STATIC; body.mass = 0; body.updateMassProperties();
-    body.position.set(KEEP_X[rackIndex % KEEP_X.length], HALF + .012, 5.45);
+    const from=body.position.clone();
+    const to=new CANNON.Vec3(KEEP_X[rackIndex % KEEP_X.length], HALF + .012, 5.45);
+    this.stashTransitions.set(id,{from,to,elapsed:0,duration:.38});
     body.velocity.setZero(); body.angularVelocity.setZero(); body.force.setZero(); body.torque.setZero();
     body.aabbNeedsUpdate = true;
+  }
+
+  updateStashes(delta){
+    for(const [id,transition] of this.stashTransitions){
+      transition.elapsed=Math.min(transition.duration,transition.elapsed+delta);
+      const t=transition.elapsed/transition.duration,eased=t*t*(3-2*t),body=this.bodies[id];
+      body.position.set(
+        transition.from.x+(transition.to.x-transition.from.x)*eased,
+        transition.from.y+(transition.to.y-transition.from.y)*eased,
+        transition.from.z+(transition.to.z-transition.from.z)*eased,
+      );
+      body.aabbNeedsUpdate=true;
+      if(t>=1){body.position.copy(transition.to);this.stashTransitions.delete(id);}
+    }
   }
 
   sync(meshes) {
