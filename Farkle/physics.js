@@ -5,6 +5,7 @@ const DIE_SIZE = .9;
 const HALF = DIE_SIZE / 2;
 const GRAVITY = 19;
 const KEEP_X = [-3.85, -2.31, -.77, .77, 2.31, 3.85];
+const THROW_POWER = { low: .62, medium: 1, high: 1.42 };
 
 function topFace(body) {
   const axes = [
@@ -83,15 +84,18 @@ export class DicePhysics {
     this.bodies.push(body);
   }
 
-  throwDice(ids) {
+  throwDice(ids, power = 'medium') {
+    const strength = THROW_POWER[power] || THROW_POWER.medium;
     const positions = [-3.85, -2.31, -.77, .77, 2.31, 3.85];
     ids.forEach((id, index) => {
       const body = this.bodies[id];
       body.type = CANNON.Body.DYNAMIC; body.mass = 1; body.updateMassProperties(); body.wakeUp();
       body.position.set(positions[index % positions.length], 2.5 + Math.random() * .65, Math.random() * 4.6 - 2.3);
       body.quaternion.setFromEuler(Math.random() * 6, Math.random() * 6, Math.random() * 6);
-      body.velocity.set((Math.random() - .5) * 4.5, 1 + Math.random() * 2.5, (Math.random() - .5) * 6.5);
-      body.angularVelocity.set((Math.random() - .5) * 18, (Math.random() - .5) * 17, (Math.random() - .5) * 18);
+      // The lobby power scales the actual launch impulse/velocity, not just the animation.
+      body.velocity.set((Math.random() - .5) * 4.5 * strength, (1 + Math.random() * 2.5) * strength, (Math.random() - .5) * 6.5 * strength);
+      const spin = Math.sqrt(strength);
+      body.angularVelocity.set((Math.random() - .5) * 18 * spin, (Math.random() - .5) * 17 * spin, (Math.random() - .5) * 18 * spin);
       body.force.setZero(); body.torque.setZero(); body.aabbNeedsUpdate = true;
     });
     this.roll = { ids: [...ids], elapsed: 0, targets: null };
