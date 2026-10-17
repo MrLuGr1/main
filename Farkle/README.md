@@ -23,8 +23,9 @@ Three.js and Cannon-es are pinned to versioned jsDelivr URLs. An internet connec
 - A roll animates for two seconds. A roll with no scoring selection is a Farkle and clears the current turn total.
 - Reach the selected target to win. If all six dice score, Hot Dice returns all six to the hand for another roll.
 - Choose 1,000, 3,000, 5,000, 10,000, or a custom target up to 100,000 before the match.
-- Easy mode outlines valid scoring dice in red; Hard mode leaves those dice unmarked.
+- Easy mode outlines valid scoring dice; the guide shifts from red to black or white if the active skin needs more contrast. Hard mode leaves scoring dice unmarked.
 - Pick from ten locally generated cube skins. Several use a slow emissive pulse. Your skin choice is remembered in local storage.
+- Choose Low, Medium, or High throw power in the lobby; it scales the dice launch velocities and spin.
 
 ## Modules
 
