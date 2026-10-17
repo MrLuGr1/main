@@ -2,15 +2,22 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.m
 import { DicePhysics } from './physics.js';
 import { findScoringOptions, scoreSelection } from './scoring.js';
 import { chooseBotMove, makePlayers } from './bot.js';
-import { ParticleEffects } from './effects.js';
+import { ParticleEffects, AmbientPixels } from './effects.js';
 
 const canvas = document.querySelector('#dice-table');
 const tableWrap = document.querySelector('#table-wrap');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x101815);
-const camera = new THREE.OrthographicCamera(-8, 8, 6, -6, .1, 45);
-camera.position.set(0, 20, 0);
-camera.up.set(0, 0, -1);
+scene.background = new THREE.Color('#000000');
+const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, .1, 80);
+// Fixed isometric orbit: 35° above the table, 45° around its diagonal.
+const ISO_ELEVATION = THREE.MathUtils.degToRad(35);
+const ISO_AZIMUTH = THREE.MathUtils.degToRad(45);
+const cameraRadius = 28;
+camera.position.set(
+  cameraRadius * Math.cos(ISO_ELEVATION) * Math.sin(ISO_AZIMUTH),
+  cameraRadius * Math.sin(ISO_ELEVATION),
+  cameraRadius * Math.cos(ISO_ELEVATION) * Math.cos(ISO_AZIMUTH),
+);
 camera.lookAt(0, 0, 0);
 
 let renderer;
@@ -29,21 +36,21 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
 
-scene.add(new THREE.HemisphereLight(0xe5f0d9, 0x152b26, 2.1));
-const keyLight = new THREE.DirectionalLight(0xffe6b0, 3.2);
-keyLight.position.set(-3, 13, -5);
+scene.add(new THREE.HemisphereLight('#ffffff', '#650000', 2.2));
+const keyLight = new THREE.DirectionalLight('#ffffff', 3.2);
+keyLight.position.set(-3, 16, -5);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(1024, 1024);
-keyLight.shadow.camera.left = -9; keyLight.shadow.camera.right = 9;
-keyLight.shadow.camera.top = 8; keyLight.shadow.camera.bottom = -8;
+keyLight.shadow.camera.left = -12; keyLight.shadow.camera.right = 12;
+keyLight.shadow.camera.top = 12; keyLight.shadow.camera.bottom = -12;
 keyLight.shadow.bias = -.0007;
 scene.add(keyLight);
-const fillLight = new THREE.PointLight(0x54d8b4, 22, 18, 2);
-fillLight.position.set(0, 7, 2); scene.add(fillLight);
+const fillLight = new THREE.PointLight('#c30000', 18, 22, 2);
+fillLight.position.set(0, 9, 3); scene.add(fillLight);
 
 function canvasTexture(draw) {
   const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 128;
+  canvas.width = canvas.height = 512;
   const context = canvas.getContext('2d');
   draw(context, canvas.width);
   const texture = new THREE.CanvasTexture(canvas);
@@ -54,7 +61,25 @@ function canvasTexture(draw) {
   return texture;
 }
 
-function makeFaceTexture(value) {
+const PALETTE = { black: '#000000', maroon: '#650000', white: '#ffffff', red: '#c30000', gray: '#b0aea8' };
+const SKINS = {
+  basic:  { base: PALETTE.gray, trim: PALETTE.white, pip: PALETTE.black, pattern: 'edge', pulse: false },
+  aurora: { base: PALETTE.black, trim: PALETTE.white, pip: PALETTE.red, pattern: 'aurora', pulse: true },
+  lava:   { base: PALETTE.maroon, trim: PALETTE.red, pip: PALETTE.white, pattern: 'lava', pulse: true },
+  crt:    { base: PALETTE.black, trim: PALETTE.red, pip: PALETTE.white, pattern: 'scan', pulse: false },
+  pearl:  { base: PALETTE.white, trim: PALETTE.gray, pip: PALETTE.maroon, pattern: 'pearl', pulse: false },
+  toxic:  { base: PALETTE.gray, trim: PALETTE.red, pip: PALETTE.maroon, pattern: 'static', pulse: true },
+  grid:   { base: PALETTE.black, trim: PALETTE.gray, pip: PALETTE.red, pattern: 'grid', pulse: false },
+  ocean:  { base: PALETTE.maroon, trim: PALETTE.gray, pip: PALETTE.white, pattern: 'tide', pulse: true },
+  candy:  { base: PALETTE.white, trim: PALETTE.red, pip: PALETTE.black, pattern: 'checker', pulse: false },
+  void:   { base: PALETTE.black, trim: PALETTE.maroon, pip: PALETTE.white, pattern: 'void', pulse: true },
+};
+let activeSkin = 'basic';
+try { activeSkin = localStorage.getItem('farkle-club-die-skin') || 'basic'; } catch { /* Storage may be disabled; the default skin is still usable. */ }
+if (!SKINS[activeSkin]) activeSkin = 'basic';
+
+function makeFaceTexture(value, skinId) {
+  const skin = SKINS[skinId] || SKINS.basic;
   const positions = {
     1: [[.5,.5]],
     2: [[.23,.23],[.77,.77]],
@@ -64,34 +89,48 @@ function makeFaceTexture(value) {
     6: [[.23,.2],[.77,.2],[.23,.5],[.77,.5],[.23,.8],[.77,.8]],
   }[value];
   return canvasTexture((ctx, size) => {
-    ctx.fillStyle = '#f0ecdc'; ctx.fillRect(0,0,size,size);
-    ctx.fillStyle = '#d1c9ae'; ctx.fillRect(0,0,size,5); ctx.fillRect(0,size-5,size,5);
-    ctx.strokeStyle = '#b9b095'; ctx.lineWidth = 3; ctx.strokeRect(4,4,size-8,size-8);
+    ctx.fillStyle = skin.base; ctx.fillRect(0,0,size,size);
+    ctx.fillStyle = skin.trim;
+    if (skin.pattern === 'grid' || skin.pattern === 'scan' || skin.pattern === 'static') {
+      const step = skin.pattern === 'scan' ? 14 : 32;
+      for(let y=12;y<size;y+=step) for(let x=12;x<size;x+=step) ctx.fillRect(x,y,skin.pattern==='static'?5:3,skin.pattern==='scan'?2:3);
+    } else if (skin.pattern === 'checker' || skin.pattern === 'aurora') {
+      for(let y=0;y<4;y++) for(let x=0;x<4;x++) if((x+y)%2===0 || skin.pattern==='aurora'&&y===0) ctx.fillRect(16+x*120,16+y*120,42,42);
+    } else if (skin.pattern === 'lava' || skin.pattern === 'tide' || skin.pattern === 'void' || skin.pattern === 'pearl') {
+      for(let i=0;i<8;i++){const x=(i*73+19)%size,y=(i*131+27)%size;ctx.fillRect(x,y,28+(i%3)*11,7+(i%4)*5);}
+    }
+    ctx.strokeStyle = skin.trim; ctx.lineWidth = 9; ctx.strokeRect(9,9,size-18,size-18);
+    ctx.strokeStyle = skin.pip; ctx.lineWidth = 4; ctx.strokeRect(25,25,size-50,size-50);
     for (const [x,y] of positions) {
-      ctx.fillStyle = '#26342c'; ctx.beginPath(); ctx.arc(x*size,y*size,9,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#47584a'; ctx.fillRect(x*size-2,y*size-5,4,3);
+      const px=Math.round(x*size/16)*16, py=Math.round(y*size/16)*16;
+      ctx.fillStyle = skin.pip; ctx.fillRect(px-24,py-24,48,48);
+      ctx.fillStyle = skin.trim; ctx.fillRect(px-9,py-9,18,18);
     }
   });
 }
-const faceMaterials = Array.from({ length: 6 }, (_, i) => new THREE.MeshStandardMaterial({ map: makeFaceTexture(i + 1), roughness: .48, metalness: .02 }));
 const faceForMaterialOrder = [3, 4, 1, 6, 2, 5]; // BoxGeometry groups: +x, -x, +y, -y, +z, -z.
-const dieMaterials = faceForMaterialOrder.map(face => faceMaterials[face - 1]);
+function makeSkinMaterials(skinId) {
+  const skin=SKINS[skinId]||SKINS.basic;
+  const faces=Array.from({length:6},(_,i)=>new THREE.MeshStandardMaterial({map:makeFaceTexture(i+1,skinId),roughness:.58,metalness:.02,emissive:new THREE.Color(skin.pulse ? skin.trim : '#000000'),emissiveIntensity:skin.pulse ? .12 : 0}));
+  return faceForMaterialOrder.map(face=>faces[face-1]);
+}
+let dieMaterials=makeSkinMaterials(activeSkin);
 
 const tableCanvasTexture = canvasTexture((ctx, size) => {
-  ctx.fillStyle = '#155245'; ctx.fillRect(0,0,size,size);
-  ctx.fillStyle = '#18594a';
-  for(let y=0;y<size;y+=8) for(let x=(y%16?0:8);x<size;x+=16) ctx.fillRect(x,y,2,2);
-  ctx.strokeStyle='#80b798';ctx.lineWidth=3;ctx.strokeRect(9,9,size-18,size-18);
-  ctx.strokeStyle='#437b62';ctx.lineWidth=1;ctx.strokeRect(14,14,size-28,size-28);
-  ctx.fillStyle='#8cbaa0';ctx.font='bold 10px monospace';ctx.textAlign='center';ctx.fillText('FARKLE  /  CLUB',size/2,size*.79);
-  ctx.fillStyle='#d8bd75';ctx.font='8px monospace';ctx.fillText('ROLL · SCORE · RISK',size/2,size*.85);
+  ctx.fillStyle = PALETTE.black; ctx.fillRect(0,0,size,size);
+  ctx.fillStyle = PALETTE.maroon;
+  for(let y=0;y<size;y+=16) for(let x=(y%32?0:16);x<size;x+=32) ctx.fillRect(x,y,4,4);
+  ctx.strokeStyle=PALETTE.gray;ctx.lineWidth=5;ctx.strokeRect(10,10,size-20,size-20);
+  ctx.strokeStyle=PALETTE.red;ctx.lineWidth=2;ctx.strokeRect(20,20,size-40,size-40);
+  ctx.fillStyle=PALETTE.white;ctx.font='bold 36px monospace';ctx.textAlign='center';ctx.fillText('FARKLE / CLUB',size/2,size*.79);
+  ctx.fillStyle=PALETTE.gray;ctx.font='28px monospace';ctx.fillText('ROLL · SCORE · RISK',size/2,size*.85);
 });
-const tableBase = new THREE.Mesh(new THREE.BoxGeometry(14.8,.62,10.8), new THREE.MeshStandardMaterial({ color:0x5c4731, roughness:.52, metalness:.16 }));
+const tableBase = new THREE.Mesh(new THREE.BoxGeometry(10,.78,15), new THREE.MeshStandardMaterial({ color:PALETTE.black, roughness:.52, metalness:.16 }));
 tableBase.position.y=-.33; tableBase.receiveShadow=true; tableBase.castShadow=true; scene.add(tableBase);
-const felt = new THREE.Mesh(new THREE.PlaneGeometry(14,10),new THREE.MeshStandardMaterial({map:tableCanvasTexture,roughness:.95}));
+const felt = new THREE.Mesh(new THREE.PlaneGeometry(9.6,14.6),new THREE.MeshStandardMaterial({map:tableCanvasTexture,roughness:.95}));
 felt.rotation.x=-Math.PI/2;felt.position.y=.002;felt.receiveShadow=true;scene.add(felt);
-const railMaterial=new THREE.MeshStandardMaterial({color:0x846d47,roughness:.43,metalness:.12});
-for(const [x,z,sx,sz] of [[0,-5.27,14.8,.18],[0,5.27,14.8,.18],[-7.31,0,.18,10.5],[7.31,0,.18,10.5]]){
+const railMaterial=new THREE.MeshStandardMaterial({color:PALETTE.red,roughness:.43,metalness:.12});
+for(const [x,z,sx,sz] of [[0,-7.37,10,.18],[0,7.37,10,.18],[-4.87,0,.18,15],[4.87,0,.18,15]]){
   const rail=new THREE.Mesh(new THREE.BoxGeometry(sx,.16,sz),railMaterial);rail.position.set(x,.055,z);rail.castShadow=true;scene.add(rail);
 }
 
@@ -99,11 +138,14 @@ const physics = new DicePhysics(6);
 const dice = Array.from({ length:6 },(_,id)=>{
   const mesh=new THREE.Mesh(new THREE.BoxGeometry(.9,.9,.9),dieMaterials);
   mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData.dieId=id;scene.add(mesh);
-  const ring=new THREE.Mesh(new THREE.RingGeometry(.56,.7,4),new THREE.MeshBasicMaterial({color:0x80e6c7,transparent:true,opacity:.9,side:THREE.DoubleSide,depthWrite:false}));
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.56,.7,4),new THREE.MeshBasicMaterial({color:PALETTE.gray,transparent:true,opacity:.9,side:THREE.DoubleSide,depthWrite:false}));
   ring.rotation.x=-Math.PI/2;ring.position.y=.028;ring.visible=false;scene.add(ring);
-  return {id,face:0,mesh,ring,kept:false};
+  const guide=new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry),new THREE.LineBasicMaterial({color:PALETTE.red,transparent:true,opacity:.55,depthWrite:false}));
+  guide.scale.setScalar(1.045);guide.visible=false;scene.add(guide);
+  return {id,face:0,mesh,ring,guide,kept:false};
 });
 const effects = new ParticleEffects(scene);
+const ambient = new AmbientPixels(document.querySelector('#ambient-pixels'));
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 const clock = new THREE.Clock();
@@ -116,7 +158,7 @@ function saveStats(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(stats))
 const ui={
   overlay:document.querySelector('#screen-overlay'),overlayKicker:document.querySelector('#overlay-kicker'),overlayTitle:document.querySelector('#overlay-title'),overlayCopy:document.querySelector('#overlay-copy'),
   lobbyFields:document.querySelector('#lobby-fields'),lobbyAction:document.querySelector('#lobby-action'),lobbyBest:document.querySelector('#lobby-best-value'),
-  playerName:document.querySelector('#player-name-input'),botCount:document.querySelector('#bot-count'),
+  playerName:document.querySelector('#player-name-input'),botCount:document.querySelector('#bot-count'),targetSelect:document.querySelector('#target-score-select'),customTarget:document.querySelector('#custom-target-score'),customTargetWrap:document.querySelector('#custom-target-wrap'),difficulty:document.querySelector('#difficulty-select'),skin:document.querySelector('#skin-select'),targetLabel:document.querySelector('#target-score-label'),targetBadge:document.querySelector('.target-badge'),
   players:document.querySelector('#player-list'),turnName:document.querySelector('#turn-name'),turnLabel:document.querySelector('#turn-label'),phase:document.querySelector('#phase-kicker'),
   turnScore:document.querySelector('#turn-score'),selectionCopy:document.querySelector('#selection-copy'),selectionScore:document.querySelector('#selection-score'),message:document.querySelector('#turn-message'),
   roll:document.querySelector('#roll-button'),rollLabel:document.querySelector('#roll-label'),keep:document.querySelector('#keep-button'),keepValue:document.querySelector('#keep-value'),bank:document.querySelector('#bank-button'),
@@ -126,6 +168,8 @@ const ui={
 let players=[];
 let currentIndex=0;
 let round=0;
+let matchTarget=10000;
+let difficulty='easy';
 let phase='lobby';
 let turnPoints=0;
 let activeIds=[];
@@ -151,16 +195,25 @@ function showLobby(mode='new',winner=null){
   if(mode==='over'){
     ui.overlayKicker.textContent=winner?.isHuman?'NICE RUN · TABLE WON':'MATCH COMPLETE';
     ui.overlayTitle.textContent=winner?.isHuman?'You took the table.':`${winner?.name||'A bot'} wins.`;
-    ui.overlayCopy.textContent=`Final score: ${formatNumber(winner?.score||0)}. Set up another table and take your luck for a second ride.`;
+    ui.overlayCopy.textContent=`Final score: ${formatNumber(winner?.score||0)} · target ${formatNumber(matchTarget)}. Set up another table and take your luck for a second ride.`;
     ui.lobbyFields.hidden=true;ui.lobbyAction.innerHTML='PLAY ANOTHER GAME <span>→</span>';
   }else{
     ui.overlayKicker.textContent='LOCAL BOT LOBBY';ui.overlayTitle.textContent='One more roll?';
-    ui.overlayCopy.textContent='Set the table, then see how long you can ride your luck. First player to 10,000 points wins.';
+    const requestedTarget=ui.targetSelect.value==='custom'?Number(ui.customTarget.value):Number(ui.targetSelect.value);
+    const previewTarget=Number.isFinite(requestedTarget)&&requestedTarget>0?requestedTarget:matchTarget;
+    ui.overlayCopy.textContent=`Set the table, choose your dice skin and difficulty. First player to ${formatNumber(previewTarget)} points wins.`;
     ui.lobbyFields.hidden=false;ui.lobbyAction.innerHTML='SEAT THE TABLE <span>→</span>';
   }
 }
 
 function startMatch(){
+  const target = ui.targetSelect.value==='custom' ? Number(ui.customTarget.value) : Number(ui.targetSelect.value);
+  if(!Number.isFinite(target)||target<1||target>100000){
+    ui.customTarget.setAttribute('aria-invalid','true');ui.customTarget.focus();showToast('Choose a target from 1 to 100,000.');return;
+  }
+  matchTarget=Math.floor(target);difficulty=ui.difficulty.value;
+  ui.targetLabel.textContent=formatNumber(matchTarget);ui.targetBadge.textContent=formatNumber(matchTarget);
+  applySkin(ui.skin.value);
   matchSerial++;
   players=makePlayers(ui.playerName.value,Number(ui.botCount.value));
   players.forEach(player=>player.score=0);
@@ -172,6 +225,31 @@ function startMatch(){
 
 ui.lobbyAction.addEventListener('click',()=>startMatch());
 document.querySelector('#new-game').addEventListener('click',()=>showLobby());
+ui.targetSelect.addEventListener('change',()=>{
+  const custom=ui.targetSelect.value==='custom';ui.customTargetWrap.hidden=!custom;
+  if(custom)ui.customTarget.focus();
+  updateTargetPreview();
+});
+ui.customTarget.addEventListener('input',()=>{ui.customTarget.removeAttribute('aria-invalid');updateTargetPreview();});
+ui.skin.value=activeSkin;
+ui.skin.addEventListener('change',()=>applySkin(ui.skin.value));
+
+function applySkin(skinId){
+  if(!SKINS[skinId])return;
+  const next=makeSkinMaterials(skinId);
+  const oldFaces=new Set(dieMaterials);
+  for(const material of oldFaces){material.map?.dispose();material.dispose();}
+  dieMaterials=next;activeSkin=skinId;
+  dice.forEach(die=>{die.mesh.material=dieMaterials;});
+  try{localStorage.setItem('farkle-club-die-skin',skinId);}catch{/* Keep the in-memory choice for this visit. */}
+}
+
+function updateTargetPreview(){
+  const value=ui.targetSelect.value==='custom'?Number(ui.customTarget.value):Number(ui.targetSelect.value);
+  if(Number.isFinite(value)&&value>=1&&value<=100000){
+    const formatted=formatNumber(value);ui.targetLabel.textContent=formatted;ui.targetBadge.textContent=formatted;
+  }
+}
 
 function renderPlayers(){
   if(!players.length){ui.players.innerHTML='<li class="empty-player">Start a lobby to seat the table.</li>';return;}
@@ -188,7 +266,7 @@ function renderPlayers(){
 function beginTurn(){
   if(!players.length)return;
   phase='waiting';turnPoints=0;keptIds=[];activeIds=[0,1,2,3,4,5];selectedIds.clear();selectedResult={valid:false,points:0};botChoice=null;
-  dice.forEach(die=>{die.face=0;die.kept=false;die.ring.visible=false;die.ring.material.color.set(0x80e6c7);});
+  dice.forEach(die=>{die.face=0;die.kept=false;die.ring.visible=false;die.guide.visible=false;die.ring.material.color.set(PALETTE.white);});
   renderPlayers();updateTurnUI();
   const player=currentPlayer();
   setMessage(player.isHuman?'Your hand is ready. Every throw takes 2 seconds.':`${player.name} is getting ready to roll…`);
@@ -226,10 +304,13 @@ function setDieHighlights(){
   for(const die of dice){
     const selected=selectedIds.has(die.id);
     const valid=possible.has(die.id);
-    die.ring.visible=die.kept||selected||(phase==='selecting'&&valid);
+    const guideVisible=difficulty==='easy'&&phase==='selecting'&&currentPlayer()?.isHuman&&valid;
+    die.guide.visible=guideVisible;
+    die.guide.position.copy(die.mesh.position);die.guide.quaternion.copy(die.mesh.quaternion);
+    die.ring.visible=die.kept||selected;
     die.ring.position.x=die.mesh.position.x;die.ring.position.z=die.mesh.position.z;
-    die.ring.material.color.set(die.kept?0xe7c87b:selected?0x7aecd0:0x5bbba3);
-    die.ring.material.opacity=selected?.98:die.kept?.72:.3;
+    die.ring.material.color.set(die.kept?PALETTE.gray:PALETTE.white);
+    die.ring.material.opacity=selected ? .98 : die.kept ? .72 : 0;
   }
 }
 
@@ -261,7 +342,7 @@ function handleRollSettled(faces){
     updateSelection();updateTurnUI();
   }else{
     const player=currentPlayer();
-    botChoice=chooseBotMove(activeIds.map(id=>dice[id]),turnPoints,player.score);
+    botChoice=chooseBotMove(activeIds.map(id=>dice[id]),turnPoints,player.score,matchTarget);
     selectedIds=new Set(botChoice.selection.indices.map(index=>activeIds[index]));
     updateSelection();setMessage(`${player.name} selects ${botChoice.selection.label} for ${formatNumber(botChoice.selection.points)} points…`);
     later(780,()=>keepSelected(true));
@@ -302,7 +383,7 @@ function hotDice(){
   phase='waiting';
   keptIds=[];activeIds=[0,1,2,3,4,5];
   dice.forEach(die=>{die.kept=false;die.ring.visible=false;});
-  effects.burst('#9ce3c0',72,new THREE.Vector3(0,.65,0));
+  effects.burst(PALETTE.white,72,new THREE.Vector3(0,.65,0));
   showToast('HOT DICE! All six are back.');
   setMessage('HOT DICE! All six dice are back in your hand.', 'hot');
   updateTurnUI();
@@ -314,7 +395,7 @@ function handleFarkle(){
   phase='farkle';
   if(player.isHuman){stats.farkles++;saveStats();refreshStats();}
   turnPoints=0;selectedIds.clear();selectedResult={valid:false,points:0};
-  effects.burst('#ed957b',56,new THREE.Vector3(0,.55,0));
+  effects.burst(PALETTE.red,56,new THREE.Vector3(0,.55,0));
   showToast('FARKLE — turn points lost');
   setMessage(`FARKLE! ${player.name} had no scoring dice; the turn total is lost.`, 'bad');
   updateTurnUI();
@@ -329,7 +410,7 @@ function bankTurn(automatic=false){
   showToast(`${player.name} banks ${formatNumber(turnPoints)} points`);
   setMessage(`${player.name} banks ${formatNumber(turnPoints)} points.`, 'good');
   renderPlayers();
-  const winner=players.find(item=>item.score>=10000);
+  const winner=players.find(item=>item.score>=matchTarget);
   if(winner){endMatch(winner);return;}
   phase='banked';turnPoints=0;
   later(800,nextTurn);
@@ -346,7 +427,7 @@ function endMatch(winner){
   phase='gameover';
   if(winner.isHuman)stats.wins++;
   saveStats();refreshStats();
-  effects.burst(winner.isHuman?'#e7c87b':'#ed957b',110,new THREE.Vector3(0,.75,0));
+  effects.burst(winner.isHuman?PALETTE.white:PALETTE.red,110,new THREE.Vector3(0,.75,0));
   renderPlayers();showLobby('over',winner);
 }
 
@@ -378,8 +459,8 @@ function resize(){
   if(rect.width<1||rect.height<1)return;
   renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.7));renderer.setSize(rect.width,rect.height,false);
   const aspect=rect.width/rect.height;
-  // Fit the whole board on narrow phones while keeping the camera perfectly top-down.
-  const halfHeight=Math.max(5.65,7.55/aspect);
+  // Orthographic bounds fit the projected 10 × 15 table from the fixed 35° / 45° view.
+  const halfHeight=Math.max(6.2,9.1/aspect);
   const halfWidth=halfHeight*aspect;
   camera.left=-halfWidth;camera.right=halfWidth;camera.top=halfHeight;camera.bottom=-halfHeight;camera.updateProjectionMatrix();
 }
@@ -397,6 +478,12 @@ function frame(){
   physics.sync(dice.map(die=>die.mesh));
   setDieHighlights();
   effects.update(dt);
+  ambient.update(dt);
+  const pulse=performance.now()*.001;
+  if(SKINS[activeSkin].pulse){
+    const intensity=.12+.13*(.5+.5*Math.sin(pulse*.45));
+    for(const material of new Set(dieMaterials))material.emissiveIntensity=intensity;
+  }
   renderer.render(scene,camera);
 }
 frame();
