@@ -81,6 +81,9 @@ if (!SKINS[activeSkin]) activeSkin = 'basic';
 
 function makeFaceTexture(value, skinId) {
   const skin = SKINS[skinId] || SKINS.basic;
+  // Always choose the strongest black/white pip contrast for the selected skin.
+  const pipColor = relativeLuminance(skin.base) > .179 ? PALETTE.black : PALETTE.white;
+  const pipOutline = pipColor === PALETTE.black ? PALETTE.white : PALETTE.black;
   const positions = {
     1: [[.5,.5]],
     2: [[.23,.23],[.77,.77]],
@@ -101,11 +104,12 @@ function makeFaceTexture(value, skinId) {
       for(let i=0;i<8;i++){const x=(i*73+19)%size,y=(i*131+27)%size;ctx.fillRect(x,y,28+(i%3)*11,7+(i%4)*5);}
     }
     ctx.strokeStyle = skin.trim; ctx.lineWidth = 9; ctx.strokeRect(9,9,size-18,size-18);
-    ctx.strokeStyle = skin.pip; ctx.lineWidth = 4; ctx.strokeRect(25,25,size-50,size-50);
+    ctx.strokeStyle = skin.trim; ctx.lineWidth = 4; ctx.strokeRect(25,25,size-50,size-50);
     for (const [x,y] of positions) {
       const px=Math.round(x*size/16)*16, py=Math.round(y*size/16)*16;
-      ctx.fillStyle = skin.pip; ctx.fillRect(px-24,py-24,48,48);
-      ctx.fillStyle = skin.trim; ctx.fillRect(px-9,py-9,18,18);
+      // Large, crisp pips with a contrasting keyline stay readable over every pattern.
+      ctx.beginPath(); ctx.arc(px,py,43,0,Math.PI*2); ctx.fillStyle=pipOutline; ctx.fill();
+      ctx.beginPath(); ctx.arc(px,py,35,0,Math.PI*2); ctx.fillStyle=pipColor; ctx.fill();
     }
   });
 }
@@ -148,6 +152,20 @@ const railMaterial=new THREE.MeshStandardMaterial({color:PALETTE.red,roughness:.
 for(const [x,z,sx,sz] of [[0,-7.37,10,.18],[0,7.37,10,.18],[-4.87,0,.18,15],[4.87,0,.18,15]]){
   const rail=new THREE.Mesh(new THREE.BoxGeometry(sx,.16,sz),railMaterial);rail.position.set(x,.055,z);rail.castShadow=true;scene.add(rail);
 }
+// A marked, on-table rack separates already-scored dice from the active roll area.
+const keptStripeMaterial=new THREE.MeshBasicMaterial({color:PALETTE.gray});
+for(let x=-4.35;x<=4.35;x+=.58){
+  const dash=new THREE.Mesh(new THREE.PlaneGeometry(.32,.055),keptStripeMaterial);
+  dash.rotation.x=-Math.PI/2;dash.position.set(x,.014,4.42);scene.add(dash);
+}
+const keptLabelTexture=canvasTexture((ctx,size)=>{
+  ctx.fillStyle=PALETTE.black;ctx.fillRect(0,0,size,size);
+  ctx.fillStyle=PALETTE.red;ctx.fillRect(0,0,size,26);ctx.fillRect(0,size-26,size,26);
+  ctx.strokeStyle=PALETTE.gray;ctx.lineWidth=8;ctx.strokeRect(12,12,size-24,size-24);
+  ctx.fillStyle=PALETTE.white;ctx.font='bold 94px monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('KEPT DICE',size/2,size/2);
+});
+const keptLabel=new THREE.Mesh(new THREE.PlaneGeometry(2.7,.52),new THREE.MeshBasicMaterial({map:keptLabelTexture,transparent:false}));
+keptLabel.rotation.x=-Math.PI/2;keptLabel.position.set(0,.014,6.68);scene.add(keptLabel);
 
 const physics = new DicePhysics(6);
 const dice = Array.from({ length:6 },(_,id)=>{
@@ -180,7 +198,7 @@ const ui={
   turnScore:document.querySelector('#turn-score'),selectionCopy:document.querySelector('#selection-copy'),selectionScore:document.querySelector('#selection-score'),message:document.querySelector('#turn-message'),
   roll:document.querySelector('#roll-button'),rollLabel:document.querySelector('#roll-label'),keep:document.querySelector('#keep-button'),keepValue:document.querySelector('#keep-value'),bank:document.querySelector('#bank-button'),
   diceCount:document.querySelector('#dice-count-label'),timer:document.querySelector('#throw-timer'),round:document.querySelector('#round-number'),toast:document.querySelector('#toast'),loading:document.querySelector('#table-loading'),
-  statWins:document.querySelector('#stat-wins'),statGames:document.querySelector('#stat-games'),statHigh:document.querySelector('#stat-high'),
+  statWins:document.querySelector('#stat-wins'),statGames:document.querySelector('#stat-games'),statHigh:document.querySelector('#stat-high'),history:document.querySelector('#roll-history'),
 };
 let players=[];
 let currentIndex=0;
@@ -194,6 +212,9 @@ let activeIds=[];
 let keptIds=[];
 let selectedIds=new Set();
 let selectedResult={valid:false,points:0};
+let rollHistory=[];
+let rollNumber=0;
+let currentHistoryEntry=null;
 let botChoice=null;
 let matchSerial=0;
 let toastTimeout=0;
@@ -204,8 +225,28 @@ function later(ms,callback){const serial=matchSerial;setTimeout(()=>{if(serial==
 function currentPlayer(){return players[currentIndex];}
 function formatNumber(value){return Math.floor(value).toLocaleString('en-US');}
 
+function renderHistory(){
+  if(!rollHistory.length){ui.history.innerHTML='<li class="history-empty">Rolls and saved dice will appear here.</li>';return;}
+  ui.history.replaceChildren(...rollHistory.map(entry=>{
+    const item=document.createElement('li');item.className='history-item';
+    const heading=document.createElement('div');heading.className='history-heading';
+    const player=document.createElement('b');player.textContent=entry.player;
+    const number=document.createElement('span');number.textContent=`THROW ${String(entry.number).padStart(2,'0')}`;
+    heading.append(player,number);
+    const rolled=document.createElement('p');rolled.className='history-values';
+    const rolledLabel=document.createElement('span');rolledLabel.textContent='ROLLED';
+    const rolledValues=document.createElement('b');rolledValues.textContent=entry.faces.join(' · ');
+    rolled.append(rolledLabel,rolledValues);
+    const saved=document.createElement('p');saved.className='history-values saved-values';
+    const savedLabel=document.createElement('span');savedLabel.textContent='SAVED';
+    const savedValues=document.createElement('b');savedValues.textContent=entry.saved.length?entry.saved.join(' · '):'—';
+    saved.append(savedLabel,savedValues);item.append(heading,rolled,saved);return item;
+  }));
+}
+
 function refreshStats(){ui.statWins.textContent=String(stats.wins);ui.statGames.textContent=String(stats.games);ui.statHigh.textContent=formatNumber(stats.bestBank);ui.lobbyBest.textContent=formatNumber(stats.bestBank);}
 refreshStats();
+renderHistory();
 
 function showLobby(mode='new',winner=null){
   phase='lobby';matchSerial++;
@@ -286,6 +327,7 @@ function renderPlayers(){
 
 function beginTurn(){
   if(!players.length)return;
+  currentHistoryEntry=null;
   phase='waiting';turnPoints=0;keptIds=[];activeIds=[0,1,2,3,4,5];selectedIds.clear();selectedResult={valid:false,points:0};botChoice=null;
   dice.forEach(die=>{die.face=0;die.kept=false;die.ring.visible=false;die.guide.visible=false;die.ring.material.color.set(PALETTE.white);});
   renderPlayers();updateTurnUI();
@@ -322,13 +364,20 @@ function updateControls(){
 function setDieHighlights(){
   const options=phase==='selecting'?findScoringOptions(activeIds.map(id=>dice[id])):[];
   const possible=new Set(options.flatMap(option=>option.indices.map(index=>activeIds[index])));
+  const selectedFaces=new Map();
+  if(selectedResult.valid){
+    for(const id of selectedIds){const face=dice[id].face;selectedFaces.set(face,[...(selectedFaces.get(face)||[]),id]);}
+  }
   for(const die of dice){
     const selected=selectedIds.has(die.id);
     const valid=possible.has(die.id);
     const guideVisible=difficulty==='easy'&&phase==='selecting'&&currentPlayer()?.isHuman&&valid;
     die.guide.visible=guideVisible;
     die.guide.position.copy(die.mesh.position);die.guide.quaternion.copy(die.mesh.quaternion);
+    const match=selectedFaces.get(die.face)||[];
+    const isMultipleLead=match.length>=3&&match[0]===die.id;
     die.selectedLayer.visible=selected&&selectedResult.valid;
+    die.selectedLayer.material.opacity=match.length>=3 ? (isMultipleLead ? .42 : .11) : .34;
     die.selectedLayer.position.copy(die.mesh.position);die.selectedLayer.quaternion.copy(die.mesh.quaternion);
     die.ring.visible=die.kept||selected;
     die.ring.position.x=die.mesh.position.x;die.ring.position.z=die.mesh.position.z;
@@ -356,6 +405,8 @@ function rollHand(){
 
 function handleRollSettled(faces){
   for(const [id,face] of faces)dice[id].face=face;
+  currentHistoryEntry={number:++rollNumber,player:currentPlayer()?.name||'Player',faces:activeIds.map(id=>dice[id].face),saved:[]};
+  rollHistory.unshift(currentHistoryEntry);rollHistory=rollHistory.slice(0,3);renderHistory();
   ui.timer.textContent='';
   const options=findScoringOptions(activeIds.map(id=>dice[id]));
   if(!options.length){handleFarkle();return;}
@@ -379,6 +430,7 @@ function keepSelected(automatic=false){
   const ids=[...selectedIds];
   const points=selectedResult.points;
   turnPoints+=points;
+  if(currentHistoryEntry&&currentHistoryEntry.player===player.name){currentHistoryEntry.saved.push(...ids.map(id=>dice[id].face));renderHistory();}
   for(const id of ids){
     dice[id].kept=true;
     physics.stashDie(id,keptIds.length);
@@ -493,6 +545,7 @@ ui.loading.hidden=true;
 function frame(){
   animationFrame=requestAnimationFrame(frame);
   const dt=Math.min(clock.getDelta(),.05);
+  physics.updateStashes(dt);
   if(phase==='rolling'){
     const faces=physics.step(dt);
     if(faces)handleRollSettled(faces);
