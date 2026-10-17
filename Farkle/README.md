@@ -26,6 +26,9 @@ Three.js and Cannon-es are pinned to versioned jsDelivr URLs. An internet connec
 - Easy mode outlines valid scoring dice; the guide shifts from red to black or white if the active skin needs more contrast. Hard mode leaves scoring dice unmarked.
 - Pick from ten locally generated cube skins. Several use a slow emissive pulse. Your skin choice is remembered in local storage.
 - Choose Low, Medium, or High throw power in the lobby; it scales the dice launch velocities and spin.
+- The table has invisible collision walls. At the end of a throw, dice settle onto separated positions without changing their size or overlapping dice already kept in the rack.
+- Kept dice glide into the marked line along the far edge of the table. The last three throws remain in the table log, including which rolled values were saved.
+- Selected triples and larger groups use a bright green lead die with a softer green overlay on the other matching dice. Pip colors automatically switch between black and white for strong contrast on every skin.
 
 ## Modules
 
