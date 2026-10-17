@@ -4,8 +4,14 @@ import * as CANNON from 'https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cann
 const DIE_SIZE = .9;
 const HALF = DIE_SIZE / 2;
 const GRAVITY = 19;
-const KEEP_X = [-3.85, -2.31, -.77, .77, 2.31, 3.85];
-const KEEP_Z = 8.25; // Outside the board wall and main 10 × 15 cm game surface.
+const KEEP_SPACING = 1.7;
+const KEEP_CENTER = 7.4;
+function keptPosition(index) {
+  // The diagonal row is outside the board in world space and its full
+  // projection remains beyond the board silhouette in the isometric view.
+  const offset=(index-2.5)*KEEP_SPACING/Math.SQRT2;
+  return {x:KEEP_CENTER+offset,z:KEEP_CENTER-offset};
+}
 const THROW_POWER = { low: .62, medium: 1, high: 1.42 };
 const REST_GAP = 1.32;
 
@@ -79,10 +85,11 @@ export class DicePhysics {
   }
 
   addDie(id) {
+    const rack=keptPosition(id);
     const body = new CANNON.Body({
       mass: 0, type: CANNON.Body.STATIC, material: this.diceMaterial,
       shape: new CANNON.Box(new CANNON.Vec3(HALF, HALF, HALF)),
-      position: new CANNON.Vec3(KEEP_X[id], HALF + .012, KEEP_Z), allowSleep: true,
+      position: new CANNON.Vec3(rack.x, HALF + .012, rack.z), allowSleep: true,
       sleepSpeedLimit: .08, sleepTimeLimit: .22, linearDamping: .22, angularDamping: .23,
     });
     body.dieId = id;
@@ -180,7 +187,8 @@ export class DicePhysics {
     const body = this.bodies[id];
     body.type = CANNON.Body.STATIC; body.mass = 0; body.updateMassProperties();
     const from=body.position.clone();
-    const to=new CANNON.Vec3(KEEP_X[rackIndex % KEEP_X.length], HALF + .012, KEEP_Z);
+    const rack=keptPosition(rackIndex);
+    const to=new CANNON.Vec3(rack.x, HALF + .012, rack.z);
     this.stashTransitions.set(id,{from,to,elapsed:0,duration:.38});
     body.velocity.setZero(); body.angularVelocity.setZero(); body.force.setZero(); body.torque.setZero();
     body.aabbNeedsUpdate = true;
