@@ -1,6 +1,6 @@
 # Farkle Club
 
-A local-first 3D Farkle game with an overhead dice table, Cannon-es rigid-body throws, Three.js rendering, and a small bot lobby.
+A local-first 3D Farkle game with an isometric 100 × 150 cm table, Cannon-es rigid-body throws, Three.js rendering, and a small bot lobby.
 
 ## Run locally
 
@@ -21,7 +21,10 @@ Three.js and Cannon-es are pinned to versioned jsDelivr URLs. An internet connec
 - `Bank & end turn` adds the turn total to your score.
 - `Space` rolls, `Enter` keeps a valid selection, and `B` banks.
 - A roll animates for two seconds. A roll with no scoring selection is a Farkle and clears the current turn total.
-- Score 10,000 to win. If all six dice score, Hot Dice returns all six to the hand for another roll.
+- Reach the selected target to win. If all six dice score, Hot Dice returns all six to the hand for another roll.
+- Choose 1,000, 3,000, 5,000, 10,000, or a custom target up to 100,000 before the match.
+- Easy mode outlines valid scoring dice in red; Hard mode leaves those dice unmarked.
+- Pick from ten locally generated cube skins. Several use a slow emissive pulse. Your skin choice is remembered in local storage.
 
 ## Modules
 
@@ -30,7 +33,7 @@ Three.js and Cannon-es are pinned to versioned jsDelivr URLs. An internet connec
 - `physics.js` — Cannon-es world, dice bodies, throws, and two-second settling.
 - `scoring.js` — pure Farkle scoring and scoring-subset enumeration.
 - `bot.js` — bot seats and a simple risk-aware move choice.
-- `effects.js` — short GPU particle bursts for Hot Dice, Farkles, and wins.
+- `effects.js` — GPU bursts for Hot Dice, Farkles, and wins, plus a cursor-reactive background pixel field.
 
 The scoring module and game state are intentionally separate from rendering and storage so a future API or WebSocket transport can replace the local match coordinator.
 
