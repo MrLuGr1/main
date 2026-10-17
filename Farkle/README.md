@@ -27,8 +27,9 @@ Three.js and Cannon-es are pinned to versioned jsDelivr URLs. An internet connec
 - Pick from ten locally generated cube skins. Several use a slow emissive pulse. Your skin choice is remembered in local storage.
 - Choose Low, Medium, or High throw power in the lobby; it scales the dice launch velocities and spin.
 - The table has invisible collision walls. At the end of a throw, dice settle onto separated positions without changing their size or overlapping dice already kept in the rack.
-- Kept dice glide into a separate tray beyond the outside edge of the board. The last three throws remain in the table log, including which rolled values were saved.
-- In selected triples and larger groups, the lead die has a transparent green overlay and the other matching dice use blue. Pip colors automatically switch between black and white for strong contrast on every skin.
+- Kept dice move to a separate six-slot rail below the 3D board, so the staging area cannot overlap the felt or board labels. The last three throws remain in the table log, including which rolled values were saved.
+- In selected triples and larger groups, the lead die has a transparent green overlay and the other matching dice use blue. Clicking a blue die promotes it to the green lead; clicking the lead again deselects it.
+- Pip colors automatically switch between black and white for strong contrast on every skin.
 
 ## Modules
 
