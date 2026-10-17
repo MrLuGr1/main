@@ -153,35 +153,10 @@ const railMaterial=new THREE.MeshStandardMaterial({color:PALETTE.red,roughness:.
 for(const [x,z,sx,sz] of [[0,-7.37,10,.18],[0,7.37,10,.18],[-4.87,0,.18,15],[4.87,0,.18,15]]){
   const rail=new THREE.Mesh(new THREE.BoxGeometry(sx,.16,sz),railMaterial);rail.position.set(x,.055,z);rail.castShadow=true;scene.add(rail);
 }
-// The tray is angled parallel to the camera's screen horizon and sits beyond
-// the board's projected silhouette, so it cannot look like another board lane.
-const keptTray = new THREE.Mesh(
-  new THREE.BoxGeometry(10.2,.18,3),
-  new THREE.MeshStandardMaterial({color:PALETTE.gray,roughness:.72,metalness:.08}),
-);
-keptTray.position.set(7.4,-.078,7.4);keptTray.rotation.y=Math.PI/4;keptTray.receiveShadow=true;keptTray.castShadow=true;scene.add(keptTray);
-const keptTrayEdge=new THREE.Mesh(new THREE.BoxGeometry(9.95,.035,.045),new THREE.MeshBasicMaterial({color:PALETTE.red}));
-keptTrayEdge.position.set(7.4-.65/Math.SQRT2,.014,7.4-.65/Math.SQRT2);keptTrayEdge.rotation.y=Math.PI/4;scene.add(keptTrayEdge);
-const keptStripeMaterial=new THREE.MeshBasicMaterial({color:PALETTE.gray});
-for(let x=-4.35;x<=4.35;x+=.58){
-  const dash=new THREE.Mesh(new THREE.PlaneGeometry(.32,.055),keptStripeMaterial);
-  dash.rotation.set(-Math.PI/2,Math.PI/4,0);
-  dash.position.set(7.4+(x-.65)/Math.SQRT2,.014,7.4-(x+.65)/Math.SQRT2);scene.add(dash);
-}
-const keptLabelTexture=canvasTexture((ctx,size)=>{
-  ctx.fillStyle=PALETTE.black;ctx.fillRect(0,0,size,size);
-  ctx.fillStyle=PALETTE.red;ctx.fillRect(0,0,size,26);ctx.fillRect(0,size-26,size,26);
-  ctx.strokeStyle=PALETTE.gray;ctx.lineWidth=8;ctx.strokeRect(12,12,size-24,size-24);
-  ctx.fillStyle=PALETTE.white;ctx.font='bold 94px monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('KEPT DICE',size/2,size/2);
-});
-const keptLabel=new THREE.Mesh(new THREE.PlaneGeometry(2.7,.52),new THREE.MeshBasicMaterial({map:keptLabelTexture,transparent:false}));
-keptLabel.rotation.set(-Math.PI/2,Math.PI/4,0);
-keptLabel.position.set(7.4+.9/Math.SQRT2,.014,7.4+.9/Math.SQRT2);scene.add(keptLabel);
-
 const physics = new DicePhysics(6);
 const dice = Array.from({ length:6 },(_,id)=>{
   const mesh=new THREE.Mesh(new THREE.BoxGeometry(.9,.9,.9),dieMaterials);
-  mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData.dieId=id;scene.add(mesh);
+  mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData.dieId=id;mesh.visible=false;scene.add(mesh);
   const ring=new THREE.Mesh(new THREE.RingGeometry(.56,.7,4),new THREE.MeshBasicMaterial({color:PALETTE.gray,transparent:true,opacity:.9,side:THREE.DoubleSide,depthWrite:false}));
   ring.rotation.x=-Math.PI/2;ring.position.y=.028;ring.visible=false;scene.add(ring);
   const guide=new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry),new THREE.LineBasicMaterial({color:PALETTE.red,transparent:true,opacity:.55,depthWrite:false}));
@@ -210,6 +185,7 @@ const ui={
   roll:document.querySelector('#roll-button'),rollLabel:document.querySelector('#roll-label'),keep:document.querySelector('#keep-button'),keepValue:document.querySelector('#keep-value'),bank:document.querySelector('#bank-button'),
   diceCount:document.querySelector('#dice-count-label'),timer:document.querySelector('#throw-timer'),round:document.querySelector('#round-number'),toast:document.querySelector('#toast'),loading:document.querySelector('#table-loading'),
   statWins:document.querySelector('#stat-wins'),statGames:document.querySelector('#stat-games'),statHigh:document.querySelector('#stat-high'),history:document.querySelector('#roll-history'),
+  keptTray:document.querySelector('#kept-dice-tray'),keptCount:document.querySelector('#kept-dice-count'),
 };
 let players=[];
 let currentIndex=0;
@@ -255,9 +231,30 @@ function renderHistory(){
   }));
 }
 
+const PIP_POSITIONS={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
+function renderKeptTray(){
+  const values=keptIds.map(id=>dice[id].face);
+  ui.keptCount.textContent=`${values.length} / 6`;
+  ui.keptTray.replaceChildren(...Array.from({length:6},(_,index)=>{
+    const slot=document.createElement('li');slot.className=`kept-slot${values[index]?' is-kept':''}`;
+    slot.setAttribute('aria-label',values[index]?`Kept die showing ${values[index]}`:`Empty kept-die slot ${index+1}`);
+    if(values[index]){
+      const face=document.createElement('span');face.className='kept-face';face.setAttribute('aria-hidden','true');
+      const pips=new Set(PIP_POSITIONS[values[index]]);
+      for(let pip=0;pip<9;pip++){const cell=document.createElement('i');if(pips.has(pip))cell.className='is-pip';face.append(cell);}
+      const label=document.createElement('span');label.className='kept-slot-label';label.textContent=String(index+1).padStart(2,'0');
+      slot.append(face,label);
+    }else{
+      const empty=document.createElement('span');empty.className='kept-slot-label';empty.textContent=String(index+1).padStart(2,'0');slot.append(empty);
+    }
+    return slot;
+  }));
+}
+
 function refreshStats(){ui.statWins.textContent=String(stats.wins);ui.statGames.textContent=String(stats.games);ui.statHigh.textContent=formatNumber(stats.bestBank);ui.lobbyBest.textContent=formatNumber(stats.bestBank);}
 refreshStats();
 renderHistory();
+renderKeptTray();
 
 function showLobby(mode='new',winner=null){
   phase='lobby';matchSerial++;
@@ -340,8 +337,8 @@ function beginTurn(){
   if(!players.length)return;
   currentHistoryEntry=null;
   phase='waiting';turnPoints=0;keptIds=[];activeIds=[0,1,2,3,4,5];selectedIds.clear();selectedResult={valid:false,points:0};botChoice=null;
-  dice.forEach(die=>{die.face=0;die.kept=false;die.ring.visible=false;die.guide.visible=false;die.ring.material.color.set(PALETTE.white);});
-  renderPlayers();updateTurnUI();
+  dice.forEach(die=>{die.face=0;die.kept=false;die.mesh.visible=true;die.ring.visible=false;die.guide.visible=false;die.ring.material.color.set(PALETTE.white);});
+  renderKeptTray();renderPlayers();updateTurnUI();
   const player=currentPlayer();
   setMessage(player.isHuman?'Your hand is ready. Every throw takes 2 seconds.':`${player.name} is getting ready to roll…`);
   rollHand();
@@ -382,12 +379,12 @@ function setDieHighlights(){
   for(const die of dice){
     const selected=selectedIds.has(die.id);
     const valid=possible.has(die.id);
-    const guideVisible=difficulty==='easy'&&phase==='selecting'&&currentPlayer()?.isHuman&&valid;
+    const guideVisible=die.mesh.visible&&difficulty==='easy'&&phase==='selecting'&&currentPlayer()?.isHuman&&valid;
     die.guide.visible=guideVisible;
     die.guide.position.copy(die.mesh.position);die.guide.quaternion.copy(die.mesh.quaternion);
     const match=selectedFaces.get(die.face)||[];
     const isMultipleLead=match.length>=3&&match[0]===die.id;
-    die.selectedLayer.visible=selected&&selectedResult.valid;
+    die.selectedLayer.visible=die.mesh.visible&&selected&&selectedResult.valid;
     if(match.length>=3){
       die.selectedLayer.material.color.set(isMultipleLead?SELECTION_GREEN:SELECTION_BLUE);
       die.selectedLayer.material.opacity=isMultipleLead ? .42 : .3;
@@ -396,7 +393,7 @@ function setDieHighlights(){
       die.selectedLayer.material.opacity=.34;
     }
     die.selectedLayer.position.copy(die.mesh.position);die.selectedLayer.quaternion.copy(die.mesh.quaternion);
-    die.ring.visible=die.kept||selected;
+    die.ring.visible=die.mesh.visible&&(die.kept||selected);
     die.ring.position.x=die.mesh.position.x;die.ring.position.z=die.mesh.position.z;
     die.ring.material.color.set(die.kept?PALETTE.gray:PALETTE.white);
     die.ring.material.opacity=selected ? .98 : die.kept ? .72 : 0;
@@ -415,6 +412,7 @@ function updateSelection(){
 function rollHand(){
   if(phase!=='waiting'||!activeIds.length)return;
   phase='rolling';selectedIds.clear();selectedResult={valid:false,points:0};
+  for(const id of activeIds)dice[id].mesh.visible=true;
   physics.throwDice(activeIds,throwPower);
   setMessage(currentPlayer().isHuman?'Dice rolling…':'Dice are tumbling across the table.');
   ui.timer.textContent='2.00 s';updateTurnUI();setDieHighlights();
@@ -451,8 +449,10 @@ function keepSelected(automatic=false){
   for(const id of ids){
     dice[id].kept=true;
     physics.stashDie(id,keptIds.length);
+    dice[id].mesh.visible=false;
     keptIds.push(id);
   }
+  renderKeptTray();
   activeIds=activeIds.filter(id=>!selectedIds.has(id));
   selectedIds.clear();selectedResult={valid:false,points:0};
   setDieHighlights();updateTurnUI();
@@ -475,6 +475,7 @@ function hotDice(){
   phase='waiting';
   keptIds=[];activeIds=[0,1,2,3,4,5];
   dice.forEach(die=>{die.kept=false;die.ring.visible=false;});
+  renderKeptTray();
   effects.burst(PALETTE.white,72,new THREE.Vector3(0,.65,0));
   showToast('HOT DICE! All six are back.');
   setMessage('HOT DICE! All six dice are back in your hand.', 'hot');
@@ -528,11 +529,17 @@ function onTableClick(event){
   const rect=canvas.getBoundingClientRect();
   pointer.set(((event.clientX-rect.left)/rect.width)*2-1,-((event.clientY-rect.top)/rect.height)*2+1);
   raycaster.setFromCamera(pointer,camera);
-  const hit=raycaster.intersectObjects(dice.map(die=>die.mesh),false)[0];
+  const hit=raycaster.intersectObjects(dice.filter(die=>die.mesh.visible&&activeIds.includes(die.id)).map(die=>die.mesh),false)[0];
   if(!hit)return;
   const id=hit.object.userData.dieId;
   if(!activeIds.includes(id))return;
-  if(selectedIds.has(id))selectedIds.delete(id);else selectedIds.add(id);
+  if(selectedIds.has(id)){
+    const sameFace=[...selectedIds].filter(selectedId=>dice[selectedId].face===dice[id].face);
+    if(sameFace.length>=3&&sameFace[0]!==id){
+      // Clicking a blue mate promotes it to the green lead; clicking the lead again deselects it.
+      selectedIds=new Set([id,...[...selectedIds].filter(selectedId=>selectedId!==id)]);
+    }else selectedIds.delete(id);
+  }else selectedIds.add(id);
   updateSelection();
 }
 canvas.addEventListener('pointerup',onTableClick);
@@ -551,9 +558,8 @@ function resize(){
   if(rect.width<1||rect.height<1)return;
   renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.7));renderer.setSize(rect.width,rect.height,false);
   const aspect=rect.width/rect.height;
-  // Orthographic bounds fit the projected 10 × 15 table from the fixed 35° / 45° view.
-  // Include the outside kept-dice tray in the fixed orthographic frame.
-  const halfHeight=Math.max(7.1,10.8/aspect);
+  // The game board fills the canvas; kept dice use a separate DOM rail below it.
+  const halfHeight=Math.max(6.2,9.1/aspect);
   const halfWidth=halfHeight*aspect;
   camera.left=-halfWidth;camera.right=halfWidth;camera.top=halfHeight;camera.bottom=-halfHeight;camera.updateProjectionMatrix();
 }
