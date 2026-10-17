@@ -23,5 +23,13 @@
     "url": "SubwaySurfer/subwaysurfer.html",
     "category": "web",
     "favorite": false
+  },
+  {
+    "id": "farkle-club",
+    "name": "Farkle Club",
+    "description": "3D kostková hra Farkle proti botům.",
+    "url": "Farkle/index.html",
+    "category": "web",
+    "favorite": false
   }
 ]
