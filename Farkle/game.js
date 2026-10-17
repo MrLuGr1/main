@@ -62,6 +62,7 @@ function canvasTexture(draw) {
 }
 
 const PALETTE = { black: '#000000', maroon: '#650000', white: '#ffffff', red: '#c30000', gray: '#b0aea8' };
+const SELECTION_GREEN = '#00ff72';
 const SKINS = {
   basic:  { base: PALETTE.gray, trim: PALETTE.white, pip: PALETTE.black, pattern: 'edge', pulse: false },
   aurora: { base: PALETTE.black, trim: PALETTE.white, pip: PALETTE.red, pattern: 'aurora', pulse: true },
@@ -116,6 +117,20 @@ function makeSkinMaterials(skinId) {
 }
 let dieMaterials=makeSkinMaterials(activeSkin);
 
+function relativeLuminance(hex){
+  const rgb=hex.match(/[\da-f]{2}/gi).map(part=>parseInt(part,16)/255).map(channel=>channel<=.04045?channel/12.92:((channel+.055)/1.055)**2.4);
+  return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2];
+}
+function contrastRatio(first,second){
+  const a=relativeLuminance(first),b=relativeLuminance(second);
+  return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+}
+function guideColorForSkin(skinId){
+  const base=(SKINS[skinId]||SKINS.basic).base;
+  if(contrastRatio(PALETTE.red,base)>=3)return PALETTE.red;
+  return relativeLuminance(base)>.179?PALETTE.black:PALETTE.white;
+}
+
 const tableCanvasTexture = canvasTexture((ctx, size) => {
   ctx.fillStyle = PALETTE.black; ctx.fillRect(0,0,size,size);
   ctx.fillStyle = PALETTE.maroon;
@@ -142,7 +157,9 @@ const dice = Array.from({ length:6 },(_,id)=>{
   ring.rotation.x=-Math.PI/2;ring.position.y=.028;ring.visible=false;scene.add(ring);
   const guide=new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry),new THREE.LineBasicMaterial({color:PALETTE.red,transparent:true,opacity:.55,depthWrite:false}));
   guide.scale.setScalar(1.045);guide.visible=false;scene.add(guide);
-  return {id,face:0,mesh,ring,guide,kept:false};
+  const selectedLayer=new THREE.Mesh(mesh.geometry,new THREE.MeshBasicMaterial({color:SELECTION_GREEN,transparent:true,opacity:.34,side:THREE.DoubleSide,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1}));
+  selectedLayer.scale.setScalar(1.018);selectedLayer.visible=false;selectedLayer.renderOrder=3;scene.add(selectedLayer);
+  return {id,face:0,mesh,ring,guide,selectedLayer,kept:false};
 });
 const effects = new ParticleEffects(scene);
 const ambient = new AmbientPixels(document.querySelector('#ambient-pixels'));
@@ -158,7 +175,7 @@ function saveStats(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(stats))
 const ui={
   overlay:document.querySelector('#screen-overlay'),overlayKicker:document.querySelector('#overlay-kicker'),overlayTitle:document.querySelector('#overlay-title'),overlayCopy:document.querySelector('#overlay-copy'),
   lobbyFields:document.querySelector('#lobby-fields'),lobbyAction:document.querySelector('#lobby-action'),lobbyBest:document.querySelector('#lobby-best-value'),
-  playerName:document.querySelector('#player-name-input'),botCount:document.querySelector('#bot-count'),targetSelect:document.querySelector('#target-score-select'),customTarget:document.querySelector('#custom-target-score'),customTargetWrap:document.querySelector('#custom-target-wrap'),difficulty:document.querySelector('#difficulty-select'),skin:document.querySelector('#skin-select'),targetLabel:document.querySelector('#target-score-label'),targetBadge:document.querySelector('.target-badge'),
+  playerName:document.querySelector('#player-name-input'),botCount:document.querySelector('#bot-count'),targetSelect:document.querySelector('#target-score-select'),customTarget:document.querySelector('#custom-target-score'),customTargetWrap:document.querySelector('#custom-target-wrap'),difficulty:document.querySelector('#difficulty-select'),skin:document.querySelector('#skin-select'),throwPower:document.querySelector('#throw-power-select'),targetLabel:document.querySelector('#target-score-label'),targetBadge:document.querySelector('.target-badge'),
   players:document.querySelector('#player-list'),turnName:document.querySelector('#turn-name'),turnLabel:document.querySelector('#turn-label'),phase:document.querySelector('#phase-kicker'),
   turnScore:document.querySelector('#turn-score'),selectionCopy:document.querySelector('#selection-copy'),selectionScore:document.querySelector('#selection-score'),message:document.querySelector('#turn-message'),
   roll:document.querySelector('#roll-button'),rollLabel:document.querySelector('#roll-label'),keep:document.querySelector('#keep-button'),keepValue:document.querySelector('#keep-value'),bank:document.querySelector('#bank-button'),
@@ -170,6 +187,7 @@ let currentIndex=0;
 let round=0;
 let matchTarget=10000;
 let difficulty='easy';
+let throwPower='medium';
 let phase='lobby';
 let turnPoints=0;
 let activeIds=[];
@@ -201,7 +219,7 @@ function showLobby(mode='new',winner=null){
     ui.overlayKicker.textContent='LOCAL BOT LOBBY';ui.overlayTitle.textContent='One more roll?';
     const requestedTarget=ui.targetSelect.value==='custom'?Number(ui.customTarget.value):Number(ui.targetSelect.value);
     const previewTarget=Number.isFinite(requestedTarget)&&requestedTarget>0?requestedTarget:matchTarget;
-    ui.overlayCopy.textContent=`Set the table, choose your dice skin and difficulty. First player to ${formatNumber(previewTarget)} points wins.`;
+    ui.overlayCopy.textContent=`Set the table, choose your dice skin, throw power and difficulty. First player to ${formatNumber(previewTarget)} points wins.`;
     ui.lobbyFields.hidden=false;ui.lobbyAction.innerHTML='SEAT THE TABLE <span>→</span>';
   }
 }
@@ -211,7 +229,7 @@ function startMatch(){
   if(!Number.isFinite(target)||target<1||target>100000){
     ui.customTarget.setAttribute('aria-invalid','true');ui.customTarget.focus();showToast('Choose a target from 1 to 100,000.');return;
   }
-  matchTarget=Math.floor(target);difficulty=ui.difficulty.value;
+  matchTarget=Math.floor(target);difficulty=ui.difficulty.value;throwPower=ui.throwPower.value;
   ui.targetLabel.textContent=formatNumber(matchTarget);ui.targetBadge.textContent=formatNumber(matchTarget);
   applySkin(ui.skin.value);
   matchSerial++;
@@ -233,6 +251,9 @@ ui.targetSelect.addEventListener('change',()=>{
 ui.customTarget.addEventListener('input',()=>{ui.customTarget.removeAttribute('aria-invalid');updateTargetPreview();});
 ui.skin.value=activeSkin;
 ui.skin.addEventListener('change',()=>applySkin(ui.skin.value));
+try { ui.throwPower.value=localStorage.getItem('farkle-club-throw-power')||'medium'; } catch { ui.throwPower.value='medium'; }
+if(!['low','medium','high'].includes(ui.throwPower.value))ui.throwPower.value='medium';
+ui.throwPower.addEventListener('change',()=>{try{localStorage.setItem('farkle-club-throw-power',ui.throwPower.value);}catch{/* Keep the chosen power for this visit. */}});
 
 function applySkin(skinId){
   if(!SKINS[skinId])return;
@@ -240,7 +261,7 @@ function applySkin(skinId){
   const oldFaces=new Set(dieMaterials);
   for(const material of oldFaces){material.map?.dispose();material.dispose();}
   dieMaterials=next;activeSkin=skinId;
-  dice.forEach(die=>{die.mesh.material=dieMaterials;});
+  dice.forEach(die=>{die.mesh.material=dieMaterials;die.guide.material.color.set(guideColorForSkin(skinId));});
   try{localStorage.setItem('farkle-club-die-skin',skinId);}catch{/* Keep the in-memory choice for this visit. */}
 }
 
@@ -307,6 +328,8 @@ function setDieHighlights(){
     const guideVisible=difficulty==='easy'&&phase==='selecting'&&currentPlayer()?.isHuman&&valid;
     die.guide.visible=guideVisible;
     die.guide.position.copy(die.mesh.position);die.guide.quaternion.copy(die.mesh.quaternion);
+    die.selectedLayer.visible=selected&&selectedResult.valid;
+    die.selectedLayer.position.copy(die.mesh.position);die.selectedLayer.quaternion.copy(die.mesh.quaternion);
     die.ring.visible=die.kept||selected;
     die.ring.position.x=die.mesh.position.x;die.ring.position.z=die.mesh.position.z;
     die.ring.material.color.set(die.kept?PALETTE.gray:PALETTE.white);
@@ -326,7 +349,7 @@ function updateSelection(){
 function rollHand(){
   if(phase!=='waiting'||!activeIds.length)return;
   phase='rolling';selectedIds.clear();selectedResult={valid:false,points:0};
-  physics.throwDice(activeIds);
+  physics.throwDice(activeIds,throwPower);
   setMessage(currentPlayer().isHuman?'Dice rolling…':'Dice are tumbling across the table.');
   ui.timer.textContent='2.00 s';updateTurnUI();setDieHighlights();
 }
