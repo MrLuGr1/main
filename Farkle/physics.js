@@ -5,6 +5,7 @@ const DIE_SIZE = .9;
 const HALF = DIE_SIZE / 2;
 const GRAVITY = 19;
 const KEEP_X = [-3.85, -2.31, -.77, .77, 2.31, 3.85];
+const KEEP_Z = 8.25; // Outside the board wall and main 10 × 15 cm game surface.
 const THROW_POWER = { low: .62, medium: 1, high: 1.42 };
 const REST_GAP = 1.32;
 
@@ -81,7 +82,7 @@ export class DicePhysics {
     const body = new CANNON.Body({
       mass: 0, type: CANNON.Body.STATIC, material: this.diceMaterial,
       shape: new CANNON.Box(new CANNON.Vec3(HALF, HALF, HALF)),
-      position: new CANNON.Vec3(KEEP_X[id], HALF, 5.45), allowSleep: true,
+      position: new CANNON.Vec3(KEEP_X[id], HALF + .012, KEEP_Z), allowSleep: true,
       sleepSpeedLimit: .08, sleepTimeLimit: .22, linearDamping: .22, angularDamping: .23,
     });
     body.dieId = id;
@@ -179,7 +180,7 @@ export class DicePhysics {
     const body = this.bodies[id];
     body.type = CANNON.Body.STATIC; body.mass = 0; body.updateMassProperties();
     const from=body.position.clone();
-    const to=new CANNON.Vec3(KEEP_X[rackIndex % KEEP_X.length], HALF + .012, 5.45);
+    const to=new CANNON.Vec3(KEEP_X[rackIndex % KEEP_X.length], HALF + .012, KEEP_Z);
     this.stashTransitions.set(id,{from,to,elapsed:0,duration:.38});
     body.velocity.setZero(); body.angularVelocity.setZero(); body.force.setZero(); body.torque.setZero();
     body.aabbNeedsUpdate = true;
