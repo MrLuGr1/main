@@ -153,18 +153,20 @@ const railMaterial=new THREE.MeshStandardMaterial({color:PALETTE.red,roughness:.
 for(const [x,z,sx,sz] of [[0,-7.37,10,.18],[0,7.37,10,.18],[-4.87,0,.18,15],[4.87,0,.18,15]]){
   const rail=new THREE.Mesh(new THREE.BoxGeometry(sx,.16,sz),railMaterial);rail.position.set(x,.055,z);rail.castShadow=true;scene.add(rail);
 }
-// The kept-dice tray is a separate staging area beyond the board's outer edge.
+// The tray is angled parallel to the camera's screen horizon and sits beyond
+// the board's projected silhouette, so it cannot look like another board lane.
 const keptTray = new THREE.Mesh(
-  new THREE.BoxGeometry(9.6,.18,1.5),
+  new THREE.BoxGeometry(10.2,.18,3),
   new THREE.MeshStandardMaterial({color:PALETTE.gray,roughness:.72,metalness:.08}),
 );
-keptTray.position.set(0,-.078,8.45);keptTray.receiveShadow=true;keptTray.castShadow=true;scene.add(keptTray);
-const keptTrayEdge=new THREE.Mesh(new THREE.BoxGeometry(9.35,.035,.045),new THREE.MeshBasicMaterial({color:PALETTE.red}));
-keptTrayEdge.position.set(0,.014,7.76);scene.add(keptTrayEdge);
+keptTray.position.set(7.4,-.078,7.4);keptTray.rotation.y=Math.PI/4;keptTray.receiveShadow=true;keptTray.castShadow=true;scene.add(keptTray);
+const keptTrayEdge=new THREE.Mesh(new THREE.BoxGeometry(9.95,.035,.045),new THREE.MeshBasicMaterial({color:PALETTE.red}));
+keptTrayEdge.position.set(7.4-.65/Math.SQRT2,.014,7.4-.65/Math.SQRT2);keptTrayEdge.rotation.y=Math.PI/4;scene.add(keptTrayEdge);
 const keptStripeMaterial=new THREE.MeshBasicMaterial({color:PALETTE.gray});
 for(let x=-4.35;x<=4.35;x+=.58){
   const dash=new THREE.Mesh(new THREE.PlaneGeometry(.32,.055),keptStripeMaterial);
-  dash.rotation.x=-Math.PI/2;dash.position.set(x,.014,7.91);scene.add(dash);
+  dash.rotation.set(-Math.PI/2,Math.PI/4,0);
+  dash.position.set(7.4+(x-.65)/Math.SQRT2,.014,7.4-(x+.65)/Math.SQRT2);scene.add(dash);
 }
 const keptLabelTexture=canvasTexture((ctx,size)=>{
   ctx.fillStyle=PALETTE.black;ctx.fillRect(0,0,size,size);
@@ -173,7 +175,8 @@ const keptLabelTexture=canvasTexture((ctx,size)=>{
   ctx.fillStyle=PALETTE.white;ctx.font='bold 94px monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('KEPT DICE',size/2,size/2);
 });
 const keptLabel=new THREE.Mesh(new THREE.PlaneGeometry(2.7,.52),new THREE.MeshBasicMaterial({map:keptLabelTexture,transparent:false}));
-keptLabel.rotation.x=-Math.PI/2;keptLabel.position.set(0,.014,8.98);scene.add(keptLabel);
+keptLabel.rotation.set(-Math.PI/2,Math.PI/4,0);
+keptLabel.position.set(7.4+.9/Math.SQRT2,.014,7.4+.9/Math.SQRT2);scene.add(keptLabel);
 
 const physics = new DicePhysics(6);
 const dice = Array.from({ length:6 },(_,id)=>{
@@ -550,7 +553,7 @@ function resize(){
   const aspect=rect.width/rect.height;
   // Orthographic bounds fit the projected 10 × 15 table from the fixed 35° / 45° view.
   // Include the outside kept-dice tray in the fixed orthographic frame.
-  const halfHeight=Math.max(6.6,10.1/aspect);
+  const halfHeight=Math.max(7.1,10.8/aspect);
   const halfWidth=halfHeight*aspect;
   camera.left=-halfWidth;camera.right=halfWidth;camera.top=halfHeight;camera.bottom=-halfHeight;camera.updateProjectionMatrix();
 }
