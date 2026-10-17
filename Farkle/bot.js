@@ -1,11 +1,11 @@
 import { findScoringOptions } from './scoring.js';
 
 const BOT_NAMES = ['Moss', 'Rivet', 'Nova'];
-const BOT_COLORS = ['#a78bfa', '#58d6c1', '#ff9d6e'];
+const BOT_COLORS = ['#c30000', '#b0aea8', '#ffffff'];
 
 export function makePlayers(humanName, botCount) {
   const name = humanName.trim().slice(0, 18) || 'You';
-  const players = [{ id: 'human', name, isHuman: true, score: 0, color: '#e4c879' }];
+  const players = [{ id: 'human', name, isHuman: true, score: 0, color: '#ffffff' }];
   for (let index = 0; index < botCount; index++) {
     players.push({ id: `bot-${index + 1}`, name: BOT_NAMES[index], isHuman: false, score: 0, color: BOT_COLORS[index] });
   }
