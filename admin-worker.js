@@ -101,7 +101,13 @@ async function readProjects(env, forWrite = false) {
   // Public page views should not depend on an admin write token. Reading the raw
   // public JSON also avoids consuming GitHub's low unauthenticated API quota.
   if (!forWrite) {
-    const response = await fetch(publicProjectsUrl(env), { headers: { Accept: 'application/json' } });
+    // GitHub's raw host may briefly cache a previous projects.json after a write.
+    // Bypass that cache so a just-deleted item cannot reappear on the next refresh.
+    const freshUrl = `${publicProjectsUrl(env)}?v=${Date.now()}`;
+    const response = await fetch(freshUrl, {
+      headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
+      cache: 'no-store',
+    });
     if (response.status === 404) return { projects: [], sha: null };
     if (!response.ok) throw new Error(`Veřejné čtení projektů z GitHubu selhalo (${response.status}).`);
     const projects = await response.json();
@@ -211,7 +217,9 @@ export default {
         const projects = state.projects.filter(project => project.id !== deleteMatch[1]);
         if (projects.length === state.projects.length) return responseJson({ error: 'Projekt nebyl nalezen.' }, 404, cors);
         await writeProjects(env, projects, state.sha);
-        return responseJson({ ok: true }, 200, cors);
+        // Return the committed list so the client can reconcile immediately,
+        // without waiting for a separate possibly stale GET request.
+        return responseJson({ ok: true, projects }, 200, cors);
       }
       if (deleteMatch && request.method === 'PUT') {
         const project = cleanProject(await request.json());
@@ -230,4 +238,3 @@ export default {
     }
   },
 };
-

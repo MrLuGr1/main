@@ -40,6 +40,8 @@
   let isAdmin = false;
   let editingProjectId = '';
   let faviconRequestId = 0;
+  // Invalidates project-list requests that began before a successful mutation.
+  let projectStateRevision = 0;
 
   function readProjects() {
     try {
@@ -91,16 +93,27 @@
     const headers = new Headers(options.headers || {});
     if (options.body) headers.set('Content-Type', 'application/json');
     if (adminToken) headers.set('Authorization', `Bearer ${adminToken}`);
-    const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    const response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers,
+      ...(options.method ? {} : { cache: 'no-store' }),
+    });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || `API vrátilo chybu ${response.status}.`);
+    if (!response.ok) {
+      const error = new Error(payload.error || `API vrátilo chybu ${response.status}.`);
+      error.status = response.status;
+      throw error;
+    }
     return payload;
   }
 
   async function loadSharedProjects() {
     if (!API_BASE) return;
+    const requestRevision = projectStateRevision;
     try {
       const result = await apiRequest('/api/projects');
+      // A slower initial GET must never undo a newer add/edit/delete response.
+      if (requestRevision !== projectStateRevision) return;
       const custom = Array.isArray(result.projects) ? result.projects.filter(isValidProject) : [];
       projects = [...starterProjects, ...custom];
       saveProjects();
@@ -216,14 +229,30 @@
       remove.addEventListener('click', async event => {
         event.stopPropagation();
         if (!isAdmin) return;
+        if (remove.disabled) return;
+        remove.disabled = true;
         try {
-          await apiRequest(`/api/projects/${encodeURIComponent(project.id)}`, { method: 'DELETE' });
-          projects = projects.filter(item => item.id !== project.id);
+          const result = await apiRequest(`/api/projects/${encodeURIComponent(project.id)}`, { method: 'DELETE' });
+          projectStateRevision += 1;
+          projects = Array.isArray(result.projects)
+            ? [...starterProjects, ...result.projects.filter(isValidProject)]
+            : projects.filter(item => item.id !== project.id);
           saveProjects();
           render();
           showToast('Projekt byl odebrán ze sdíleného seznamu.');
         } catch (error) {
+          if (error.status === 404) {
+            // The backend is already authoritative: remove stale UI even if another
+            // tab or an earlier request deleted this item first.
+            projectStateRevision += 1;
+            projects = projects.filter(item => item.id !== project.id);
+            saveProjects();
+            render();
+            showToast('Projekt už ve sdíleném seznamu není; zobrazení bylo synchronizováno.');
+            return;
+          }
           showToast(`Projekt se nepodařilo odebrat: ${error.message}`);
+          remove.disabled = false;
         }
       });
       actions.append(edit, remove);
@@ -567,6 +596,7 @@
       showToast(`Projekt se nepodařilo uložit: ${error.message}`);
       return;
     }
+    projectStateRevision += 1;
     if (editingProjectId) {
       const index = projects.findIndex(item => item.id === editingProjectId);
       if (index >= 0) projects[index] = project;
@@ -730,4 +760,3 @@
   startPixelTrail();
   requestLocalWeather();
 })();
-
