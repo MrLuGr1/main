@@ -70,10 +70,17 @@ async function isAuthenticated(request, env) {
 }
 
 function repoConfig(env) {
-  if (!env.GITHUB_TOKEN || !env.REPO_OWNER || !env.REPO_NAME || !env.REPO_BRANCH) {
+  if (!env.REPO_OWNER || !env.REPO_NAME || !env.REPO_BRANCH) {
     throw new Error('Chybí serverová konfigurace GitHubu.');
   }
   return `https://api.github.com/repos/${encodeURIComponent(env.REPO_OWNER)}/${encodeURIComponent(env.REPO_NAME)}/contents/${PROJECTS_PATH}`;
+}
+
+function publicProjectsUrl(env) {
+  if (!env.REPO_OWNER || !env.REPO_NAME || !env.REPO_BRANCH) {
+    throw new Error('Chybí serverová konfigurace GitHubu.');
+  }
+  return `https://raw.githubusercontent.com/${encodeURIComponent(env.REPO_OWNER)}/${encodeURIComponent(env.REPO_NAME)}/${encodeURIComponent(env.REPO_BRANCH)}/${PROJECTS_PATH}`;
 }
 
 async function githubRequest(url, env, options = {}) {
@@ -90,7 +97,18 @@ async function githubRequest(url, env, options = {}) {
   });
 }
 
-async function readProjects(env) {
+async function readProjects(env, forWrite = false) {
+  // Public page views should not depend on an admin write token. Reading the raw
+  // public JSON also avoids consuming GitHub's low unauthenticated API quota.
+  if (!forWrite) {
+    const response = await fetch(publicProjectsUrl(env), { headers: { Accept: 'application/json' } });
+    if (response.status === 404) return { projects: [], sha: null };
+    if (!response.ok) throw new Error(`Veřejné čtení projektů z GitHubu selhalo (${response.status}).`);
+    const projects = await response.json();
+    if (!Array.isArray(projects)) throw new Error('projects.json musí obsahovat JSON pole.');
+    return { projects, sha: null };
+  }
+
   const url = `${repoConfig(env)}?ref=${encodeURIComponent(env.REPO_BRANCH)}`;
   const response = await githubRequest(url, env);
   if (response.status === 404) return { projects: [], sha: null };
@@ -102,6 +120,7 @@ async function readProjects(env) {
 }
 
 async function writeProjects(env, projects, sha) {
+  if (!env.GITHUB_TOKEN) throw new Error('Chybí GITHUB_TOKEN pro zápis projektů.');
   const body = {
     message: 'Update Pixel Desk projects',
     content: bytesToBase64(encoder.encode(`${JSON.stringify(projects, null, 2)}\n`)),
@@ -181,14 +200,14 @@ export default {
       if (url.pathname === '/api/projects' && request.method === 'POST') {
         const project = cleanProject(await request.json());
         if (!project) return responseJson({ error: 'Projekt obsahuje neplatné údaje.' }, 400, cors);
-        const state = await readProjects(env);
+        const state = await readProjects(env, true);
         if (state.projects.some(item => item.id === project.id)) return responseJson({ error: 'Projekt s tímto ID už existuje.' }, 409, cors);
         await writeProjects(env, [...state.projects, project], state.sha);
         return responseJson({ ok: true, project }, 201, cors);
       }
       const deleteMatch = url.pathname.match(/^\/api\/projects\/([\w-]{1,100})$/);
       if (deleteMatch && request.method === 'DELETE') {
-        const state = await readProjects(env);
+        const state = await readProjects(env, true);
         const projects = state.projects.filter(project => project.id !== deleteMatch[1]);
         if (projects.length === state.projects.length) return responseJson({ error: 'Projekt nebyl nalezen.' }, 404, cors);
         await writeProjects(env, projects, state.sha);
@@ -197,7 +216,7 @@ export default {
       if (deleteMatch && request.method === 'PUT') {
         const project = cleanProject(await request.json());
         if (!project || project.id !== deleteMatch[1]) return responseJson({ error: 'Projekt obsahuje neplatné údaje.' }, 400, cors);
-        const state = await readProjects(env);
+        const state = await readProjects(env, true);
         const index = state.projects.findIndex(item => item.id === deleteMatch[1]);
         if (index < 0) return responseJson({ error: 'Projekt nebyl nalezen.' }, 404, cors);
         const projects = [...state.projects];
