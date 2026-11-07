@@ -49,13 +49,14 @@ The deployed Worker URL for this project is `https://pixel-desk-admin.mrlugr1.wo
 <meta name="pixel-desk-api" content="https://pixel-desk-admin.mrlugr1.workers.dev">
 ```
 
-The public URL is configuration, not a credential. The Pages site can load shared projects and use Admin Login. A successful login receives a signed, 30-minute token held only in page memory; reloading the page signs the admin out. Add and remove actions are checked by the Worker and committed to `projects.json` in this repository.
+The public URL is configuration, not a credential. The Pages site can load shared projects and use Admin Login. Public reads fetch `projects.json` from GitHub's raw public-content host and do not use `GITHUB_TOKEN`; the token is used only for authenticated admin writes. A successful login receives a signed, 30-minute token held only in page memory; reloading the page signs the admin out. Add and remove actions are checked by the Worker and committed to `projects.json` in this repository.
 
 ## Security notes
 
 - There is no default admin password and no client-side password hash. The admin UI stays read-only until the API is configured and authenticates the user.
 - Use a strong, unique password. The password is sent over HTTPS to the Worker for verification; only its SHA-256 hash is stored as a Cloudflare secret.
 - The GitHub token is only used by the Worker and is limited to repository contents. A successful project edit creates a commit in `main` and may trigger the Pages deployment.
+- If the GitHub token expires or is revoked, visitors can still read the shared list. Admin edits will require a new fine-grained Contents token stored with `npx wrangler secret put GITHUB_TOKEN`.
 - The signed API session expires after 30 minutes. Logging out clears the in-memory token; an already copied token remains valid only until its short expiry.
 - Consider enabling a Cloudflare rate-limiting rule for `POST /api/login` before sharing the admin URL widely.
 
