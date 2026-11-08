@@ -2,7 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.m
 import { DicePhysics, BOARD_SCALE, keptPosition } from './physics.js?v=20261108-5';
 import { findScoringOptions, scoreSelection } from './scoring.js';
 import { chooseBotMove, makePlayers } from './bot.js';
-import { ParticleEffects, ScoringFlames, AmbientPixels } from './effects.js?v=20261108-8';
+import { ParticleEffects, ScoringFlames, AmbientPixels } from './effects.js?v=20261108-9';
 
 const canvas = document.querySelector('#dice-table');
 const tableWrap = document.querySelector('#table-wrap');
@@ -115,12 +115,33 @@ function makeFaceTexture(value, skinId) {
   });
 }
 const faceForMaterialOrder = [3, 4, 1, 6, 2, 5]; // BoxGeometry groups: +x, -x, +y, -y, +z, -z.
-function makeSkinMaterials(skinId) {
+function makeSkinMaterial(skinId) {
   const skin=SKINS[skinId]||SKINS.basic;
-  const faces=Array.from({length:6},(_,i)=>new THREE.MeshStandardMaterial({map:makeFaceTexture(i+1,skinId),roughness:.58,metalness:.02,emissive:new THREE.Color(skin.pulse ? skin.trim : '#000000'),emissiveIntensity:skin.pulse ? .12 : 0}));
-  return faceForMaterialOrder.map(face=>faces[face-1]);
+  const faces=Array.from({length:6},(_,i)=>makeFaceTexture(i+1,skinId));
+  const atlas=document.createElement('canvas');atlas.width=1536;atlas.height=1024;
+  const context=atlas.getContext('2d');
+  faces.forEach((texture,index)=>context.drawImage(texture.image,(index%3)*512,Math.floor(index/3)*512));
+  faces.forEach(texture=>texture.dispose());
+  const map=new THREE.CanvasTexture(atlas);
+  map.colorSpace=THREE.SRGBColorSpace;map.magFilter=THREE.NearestFilter;map.minFilter=THREE.NearestFilter;map.generateMipmaps=false;
+  return new THREE.MeshStandardMaterial({map,roughness:.58,metalness:.02,emissive:new THREE.Color(skin.pulse?skin.trim:'#000000'),emissiveIntensity:skin.pulse ? .12 : 0});
 }
-let dieMaterials=makeSkinMaterials(activeSkin);
+function makeDieGeometry(){
+  const geometry=new THREE.BoxGeometry(.9,.9,.9),uv=geometry.attributes.uv,index=geometry.index;
+  geometry.groups.forEach((group,groupIndex)=>{
+    const face=faceForMaterialOrder[groupIndex],column=(face-1)%3,row=Math.floor((face-1)/3);
+    const left=column/3+2/1536,bottom=1-(row+1)/2+2/1024;
+    const width=1/3-4/1536,height=.5-4/1024;
+    for(let i=group.start;i<group.start+group.count;i++){
+      const vertex=index.getX(i),u=uv.getX(vertex),v=uv.getY(vertex);
+      uv.setXY(vertex,left+u*width,bottom+v*height);
+    }
+  });
+  uv.needsUpdate=true;geometry.computeBoundingBox();
+  return geometry;
+}
+let dieMaterial=makeSkinMaterial(activeSkin);
+const dieGeometry=makeDieGeometry();
 
 function relativeLuminance(hex){
   const rgb=hex.match(/[\da-f]{2}/gi).map(part=>parseInt(part,16)/255).map(channel=>channel<=.04045?channel/12.92:((channel+.055)/1.055)**2.4);
@@ -145,12 +166,15 @@ for(const [x,z,sx,sz] of [[0,-7.37*BOARD_SCALE,BOARD_WIDTH,.18],[0,7.37*BOARD_SC
   const rail=new THREE.Mesh(new THREE.BoxGeometry(sx,.16,sz),railMaterial);rail.position.set(x,.055,z);rail.castShadow=true;scene.add(rail);
 }
 const physics = new DicePhysics(6);
+const ringGeometry=new THREE.RingGeometry(.56,.7,4);
+const ringMaterial=new THREE.MeshBasicMaterial({color:PALETTE.gray,transparent:true,opacity:.9,side:THREE.DoubleSide,depthWrite:false});
+const selectionMaterial=new THREE.MeshBasicMaterial({color:SELECTION_GREEN,transparent:true,opacity:.38,side:THREE.DoubleSide,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1});
 const dice = Array.from({ length:6 },(_,id)=>{
-  const mesh=new THREE.Mesh(new THREE.BoxGeometry(.9,.9,.9),dieMaterials);
+  const mesh=new THREE.Mesh(dieGeometry,dieMaterial);
   mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData.dieId=id;mesh.visible=false;scene.add(mesh);
-  const ring=new THREE.Mesh(new THREE.RingGeometry(.56,.7,4),new THREE.MeshBasicMaterial({color:PALETTE.gray,transparent:true,opacity:.9,side:THREE.DoubleSide,depthWrite:false}));
+  const ring=new THREE.Mesh(ringGeometry,ringMaterial);
   ring.rotation.x=-Math.PI/2;ring.position.y=.028;ring.visible=false;scene.add(ring);
-  const selectedLayer=new THREE.Mesh(mesh.geometry,new THREE.MeshBasicMaterial({color:SELECTION_GREEN,transparent:true,opacity:.38,side:THREE.DoubleSide,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1}));
+  const selectedLayer=new THREE.Mesh(mesh.geometry,selectionMaterial);
   selectedLayer.scale.setScalar(1.018);selectedLayer.visible=false;selectedLayer.renderOrder=3;scene.add(selectedLayer);
   return {id,face:0,mesh,ring,selectedLayer,kept:false};
 });
@@ -291,11 +315,10 @@ ui.throwPower.addEventListener('change',()=>{try{localStorage.setItem('farkle-cl
 
 function applySkin(skinId){
   if(!SKINS[skinId])return;
-  const next=makeSkinMaterials(skinId);
-  const oldFaces=new Set(dieMaterials);
-  for(const material of oldFaces){material.map?.dispose();material.dispose();}
-  dieMaterials=next;activeSkin=skinId;
-  dice.forEach(die=>{die.mesh.material=dieMaterials;});
+  const next=makeSkinMaterial(skinId);
+  dieMaterial.map?.dispose();dieMaterial.dispose();
+  dieMaterial=next;activeSkin=skinId;
+  dice.forEach(die=>{die.mesh.material=dieMaterial;});
   try{localStorage.setItem('farkle-club-die-skin',skinId);}catch{/* Keep the in-memory choice for this visit. */}
 }
 
@@ -554,17 +577,12 @@ function resize(){
 new ResizeObserver(resize).observe(tableWrap);resize();
 ui.loading.hidden=true;
 
-const FRAME_INTERVAL=1000/60;
 let lastFrameTime=0;
-let frameAccumulator=0;
 function frame(timestamp){
   animationFrame=requestAnimationFrame(frame);
-  if(!lastFrameTime){lastFrameTime=timestamp;return;}
-  frameAccumulator+=Math.min(timestamp-lastFrameTime,100);
+  const dt=lastFrameTime?Math.min((timestamp-lastFrameTime)/1000,.1):0;
   lastFrameTime=timestamp;
-  if(frameAccumulator<FRAME_INTERVAL)return;
-  const dt=frameAccumulator/1000;
-  frameAccumulator=0;
+  if(!dt)return;
   physics.updateStashes(dt);
   if(phase==='rolling'){
     const faces=physics.step(dt);
@@ -578,7 +596,7 @@ function frame(timestamp){
   const pulse=performance.now()*.001;
   if(SKINS[activeSkin].pulse){
     const intensity=.12+.13*(.5+.5*Math.sin(pulse*.45));
-    for(const material of new Set(dieMaterials))material.emissiveIntensity=intensity;
+    dieMaterial.emissiveIntensity=intensity;
   }
   renderer.render(scene,camera);
   perfFrames++;
