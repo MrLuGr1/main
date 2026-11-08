@@ -95,5 +95,13 @@
     "url": "test6",
     "category": "other",
     "favorite": false
+  },
+  {
+    "id": "cbce6b9c-7fa4-4837-bea5-a036bbd45ca2",
+    "name": "cookies",
+    "description": "cookies",
+    "url": "cookies",
+    "category": "web",
+    "favorite": false
   }
 ]
