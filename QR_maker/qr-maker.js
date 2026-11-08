@@ -256,7 +256,7 @@
     document.querySelector('#theme-label').textContent = dark ? 'Světlý režim' : 'Tmavý režim';
     document.querySelector('#theme-icon').textContent = dark ? '☼' : '◐';
     themeButton.setAttribute('aria-label', dark ? 'Přepnout na světlý režim' : 'Přepnout na tmavý režim');
-    document.querySelector('meta[name="theme-color"]').content = dark ? '#141b29' : '#e9edf2';
+    document.querySelector('meta[name="theme-color"]').content = dark ? '#101e26' : '#c7d5d8';
   }
   let theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
   setTheme(theme);

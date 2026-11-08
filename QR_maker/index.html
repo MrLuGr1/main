@@ -7,77 +7,73 @@
   <script>try{if(localStorage.getItem('pixel-desk-theme-v1')==='dark')document.documentElement.dataset.theme='dark'}catch{}</script>
   <title>QR maker — Pixel Desk</title>
   <!-- Zvyš verzi ?v= při každém vydání frontendových souborů; běžné obnovení tak stáhne novou kopii. -->
-  <link rel="stylesheet" href="../style.css?v=20261014-8">
-  <link rel="stylesheet" href="qr-maker.css?v=20261014-7">
+  <link rel="stylesheet" href="../landing.css?v=20261108-6">
+  <link rel="stylesheet" href="qr-maker.css?v=20261108-1">
   <script src="qrcode.min.js?v=20261014-7" defer></script>
-  <script src="qr-maker.js?v=20261014-7" defer></script>
+  <script src="qr-maker.js?v=20261108-1" defer></script>
 </head>
 <body>
   <main class="qr-shell">
     <header class="qr-topbar">
-      <a class="qr-brand" href="../index.html"><span class="qr-brand-mark" aria-hidden="true">▦</span><span>PIXEL<span>_DESK</span><small>/ QR MAKER</small></span></a>
+      <a class="qr-brand" href="../index.html"><span class="qr-brand-mark" aria-hidden="true">▦</span><span>PIXEL<span>_DESK</span><small>/ QR maker</small></span></a>
       <div class="qr-top-actions">
-        <a class="qr-button qr-back" href="../index.html">← Zpět do projektů</a>
+      <a class="qr-button qr-back" href="../index.html"><span aria-hidden="true">←</span> Zpět do projektů</a>
         <button class="qr-button" id="theme-toggle" type="button"><span id="theme-icon" aria-hidden="true">◐</span> <span id="theme-label">Tmavý režim</span></button>
       </div>
     </header>
 
-    <section class="qr-heading">
-      <p class="qr-eyebrow">NÁSTROJ · BĚŽÍ PŘÍMO V PROHLÍŽEČI</p>
-      <h1>QR maker<span>.</span></h1>
-      <p>Vytvoř QR kód pro odkaz, zprávu nebo českou QR platbu.</p>
-    </section>
+    <section class="qr-heading"><h1>QR maker</h1><p>Vytvoř a stáhni QR kód</p></section>
 
     <section class="qr-workspace" aria-label="Generátor QR kódů">
       <form class="qr-card qr-form" id="qr-form">
-        <label class="qr-label" for="qr-mode">TYP QR KÓDU</label>
+        <label class="qr-label" for="qr-mode">Typ QR kódu</label>
         <select class="qr-input" id="qr-mode" name="mode">
-          <option value="url">🌐 Webový odkaz</option>
-          <option value="email">✉ E-mail</option>
-          <option value="sms">▤ SMS zpráva</option>
-          <option value="text">▧ Prostý text</option>
-          <option value="payment">▣ QR platba · CZK</option>
+          <option value="url">Webový odkaz</option>
+          <option value="email">E-mail</option>
+          <option value="sms">SMS zpráva</option>
+          <option value="text">Prostý text</option>
+          <option value="payment">QR platba</option>
         </select>
 
         <section class="qr-fields" data-mode-panel="url">
-          <label class="qr-label" for="url-value">WEBOVÁ ADRESA</label>
+          <label class="qr-label" for="url-value">Webová adresa</label>
           <input class="qr-input" id="url-value" type="text" inputmode="url" placeholder="https://example.com" autocomplete="url" required>
         </section>
 
         <section class="qr-fields" data-mode-panel="email" hidden>
-          <label class="qr-label" for="email-address">E-MAILOVÁ ADRESA</label>
+          <label class="qr-label" for="email-address">E-mailová adresa</label>
           <input class="qr-input" id="email-address" type="email" placeholder="jmeno@example.cz" autocomplete="email" required>
-          <label class="qr-label" for="email-subject">PŘEDMĚT <span>(VOLITELNÝ)</span></label>
+          <label class="qr-label" for="email-subject">Předmět <span>(volitelný)</span></label>
           <input class="qr-input" id="email-subject" type="text" maxlength="120" placeholder="Předmět zprávy">
-          <label class="qr-label" for="email-body">TEXT ZPRÁVY <span>(VOLITELNÝ)</span></label>
+          <label class="qr-label" for="email-body">Text zprávy <span>(volitelný)</span></label>
           <textarea class="qr-input qr-textarea" id="email-body" maxlength="1000" rows="4" placeholder="Dobrý den,"></textarea>
         </section>
 
         <section class="qr-fields" data-mode-panel="sms" hidden>
-          <label class="qr-label" for="sms-country">MEZINÁRODNÍ PŘEDVOLBA</label>
+          <label class="qr-label" for="sms-country">Mezinárodní předvolba</label>
           <select class="qr-input" id="sms-country">
             <option value="+420">Česko +420</option><option value="+421">Slovensko +421</option>
             <option value="+49">Německo +49</option><option value="+43">Rakousko +43</option>
             <option value="+1">USA / Kanada +1</option><option value="custom">Jiná předvolba…</option>
           </select>
           <input class="qr-input" id="sms-custom-country" type="text" inputmode="tel" maxlength="5" placeholder="Např. +44" aria-label="Vlastní mezinárodní předvolba" hidden disabled>
-          <label class="qr-label" for="sms-phone">TELEFONNÍ ČÍSLO</label>
+          <label class="qr-label" for="sms-phone">Telefonní číslo</label>
           <input class="qr-input" id="sms-phone" type="tel" inputmode="tel" maxlength="20" placeholder="777 123 456" required>
-          <label class="qr-label" for="sms-body">TEXT ZPRÁVY</label>
+          <label class="qr-label" for="sms-body">Text zprávy</label>
           <textarea class="qr-input qr-textarea" id="sms-body" maxlength="500" rows="3" placeholder="Text předvyplněné SMS"></textarea>
         </section>
 
         <section class="qr-fields" data-mode-panel="text" hidden>
-          <label class="qr-label" for="plain-text">TEXT NEBO DATA</label>
+          <label class="qr-label" for="plain-text">Text nebo data</label>
           <textarea class="qr-input qr-textarea" id="plain-text" maxlength="2500" rows="7" placeholder="Napiš libovolný text…" required></textarea>
         </section>
 
         <section class="qr-fields" data-mode-panel="payment" hidden>
-          <p class="qr-warning" role="note">⚠ Upozornění: Generátor plateb je v testovacím režimu, vše nemusí fungovat správně.</p>
+          <p class="qr-warning" role="note"><span aria-hidden="true">!</span> Generátor plateb je v testovacím režimu. Výsledek před odesláním ověř.</p>
           <p class="qr-help">Účet zadej jako <code>číslo</code> nebo <code>předčíslí-číslo</code>. QR obsahuje standardní český platební formát SPAYD.</p>
-          <label class="qr-label" for="pay-account">ČÍSLO ÚČTU</label>
+          <label class="qr-label" for="pay-account">Číslo účtu</label>
           <input class="qr-input" id="pay-account" type="text" inputmode="numeric" maxlength="17" placeholder="19-2000145399" required>
-          <label class="qr-label" for="pay-bank">BANKA / KÓD BANKY</label>
+          <label class="qr-label" for="pay-bank">Banka / kód banky</label>
           <select class="qr-input" id="pay-bank">
             <option value="0100">Komerční banka · 0100</option><option value="0300">ČSOB · 0300</option>
             <option value="0600">MONETA Money Bank · 0600</option><option value="0800" selected>Česká spořitelna · 0800</option>
@@ -86,7 +82,7 @@
             <option value="other">Jiný kód…</option>
           </select>
           <input class="qr-input" id="pay-bank-custom" type="text" inputmode="numeric" maxlength="4" placeholder="Čtyřmístný kód banky" aria-label="Vlastní kód banky" hidden disabled>
-          <label class="qr-label" for="pay-currency">MĚNA PLATBY</label>
+          <label class="qr-label" for="pay-currency">Měna platby</label>
           <select class="qr-input" id="pay-currency" name="currency">
             <option value="CZK" selected>CZK · Česká koruna</option>
             <option value="EUR">EUR · Euro</option>
@@ -94,30 +90,30 @@
             <option value="GBP">GBP · Britská libra</option>
             <option value="PLN">PLN · Polský zlotý</option>
           </select>
-          <label class="qr-label" for="pay-amount">ČÁSTKA <span>(VOLITELNÁ)</span></label>
+          <label class="qr-label" for="pay-amount">Částka <span>(volitelná)</span></label>
           <input class="qr-input" id="pay-amount" type="number" min="0.01" max="9999999.99" step="0.01" placeholder="250.00">
-          <label class="qr-label" for="pay-message">ZPRÁVA PRO PŘÍJEMCE <span>(VOLITELNÁ · MAX. 60 ZNAKŮ)</span></label>
+          <label class="qr-label" for="pay-message">Zpráva pro příjemce <span>(volitelná, max. 60 znaků)</span></label>
           <input class="qr-input" id="pay-message" type="text" maxlength="60" placeholder="Např. Platba za objednávku">
-          <label class="qr-label" for="pay-recipient">JMÉNO PŘÍJEMCE <span>(VOLITELNÉ · MAX. 35 ZNAKŮ)</span></label>
+          <label class="qr-label" for="pay-recipient">Jméno příjemce <span>(volitelné, max. 35 znaků)</span></label>
           <input class="qr-input" id="pay-recipient" type="text" maxlength="35" placeholder="Např. Jan Novák">
-          <label class="qr-label" for="pay-vs">VARIABILNÍ SYMBOL <span>(VOLITELNÝ)</span></label>
+          <label class="qr-label" for="pay-vs">Variabilní symbol <span>(volitelný)</span></label>
           <input class="qr-input" id="pay-vs" type="text" inputmode="numeric" pattern="[0-9]{1,10}" maxlength="10" placeholder="1234567890" autocomplete="off">
         </section>
 
         <button class="qr-button qr-generate" type="submit"><span aria-hidden="true">▦</span> Vygenerovat QR kód</button>
-        <p class="qr-privacy"><span aria-hidden="true">◆</span> Obsah se zpracuje pouze v tomto prohlížeči. Nic se neodesílá.</p>
+        <p class="qr-privacy"><span aria-hidden="true">▪</span> Generování probíhá v tomto prohlížeči</p>
       </form>
 
       <section class="qr-card qr-result" aria-labelledby="result-heading">
-        <div class="qr-result-head"><div><p class="qr-eyebrow">VÝSTUP</p><h2 id="result-heading">Tvůj QR kód</h2></div><span class="qr-live-dot" aria-hidden="true"></span></div>
+        <div class="qr-result-head"><h2 id="result-heading">QR kód</h2><span class="qr-live-dot" aria-hidden="true"></span></div>
         <div class="qr-preview" id="qr-preview"><div class="qr-placeholder" id="qr-placeholder"><span aria-hidden="true">▦</span><p>Vyplň údaje<br>a vygeneruj kód</p></div><div id="qr-canvas" aria-label="Vygenerovaný QR kód"></div></div>
-        <p class="qr-status" id="qr-status" role="status" aria-live="polite">Čekám na údaje.</p>
+        <p class="qr-status" id="qr-status" role="status" aria-live="polite">Čeká na údaje</p>
         <a class="qr-button qr-download" id="qr-download" href="#" download="qr-kod.png" hidden>↓ Stáhnout PNG</a>
         <details class="qr-data"><summary>Zobrazit obsah QR kódu</summary><pre id="qr-payload">Zatím žádný kód.</pre></details>
-        <p class="qr-footnote">QR kód před sdílením nebo platbou naskenuj a zkontroluj jeho obsah.</p>
+        <p class="qr-footnote">Před platbou ověř načtené údaje</p>
       </section>
     </section>
-    <footer class="qr-footer"><span class="qr-footer-square"></span> PIXEL DESK <span>/</span> QR MAKER · LOKÁLNÍ GENEROVÁNÍ</footer>
+    <footer class="qr-footer"><span class="qr-footer-square"></span> Pixel Desk <span>/</span> QR maker</footer>
   </main>
 </body>
 </html>

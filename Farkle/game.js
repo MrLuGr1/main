@@ -2,7 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.m
 import { DicePhysics } from './physics.js';
 import { findScoringOptions, scoreSelection } from './scoring.js';
 import { chooseBotMove, makePlayers } from './bot.js';
-import { ParticleEffects, AmbientPixels } from './effects.js';
+import { ParticleEffects, AmbientPixels } from './effects.js?v=20261108-1';
 
 const canvas = document.querySelector('#dice-table');
 const tableWrap = document.querySelector('#table-wrap');
@@ -143,7 +143,6 @@ const tableCanvasTexture = canvasTexture((ctx, size) => {
   ctx.strokeStyle=PALETTE.gray;ctx.lineWidth=5;ctx.strokeRect(10,10,size-20,size-20);
   ctx.strokeStyle=PALETTE.red;ctx.lineWidth=2;ctx.strokeRect(20,20,size-40,size-40);
   ctx.fillStyle=PALETTE.white;ctx.font='bold 36px monospace';ctx.textAlign='center';ctx.fillText('FARKLE / CLUB',size/2,size*.79);
-  ctx.fillStyle=PALETTE.gray;ctx.font='28px monospace';ctx.fillText('ROLL · SCORE · RISK',size/2,size*.85);
 });
 const tableBase = new THREE.Mesh(new THREE.BoxGeometry(10,.78,15), new THREE.MeshStandardMaterial({ color:PALETTE.black, roughness:.52, metalness:.16 }));
 tableBase.position.y=-.33; tableBase.receiveShadow=true; tableBase.castShadow=true; scene.add(tableBase);
@@ -218,14 +217,14 @@ function renderHistory(){
     const item=document.createElement('li');item.className='history-item';
     const heading=document.createElement('div');heading.className='history-heading';
     const player=document.createElement('b');player.textContent=entry.player;
-    const number=document.createElement('span');number.textContent=`THROW ${String(entry.number).padStart(2,'0')}`;
+    const number=document.createElement('span');number.textContent=`Throw ${entry.number}`;
     heading.append(player,number);
     const rolled=document.createElement('p');rolled.className='history-values';
-    const rolledLabel=document.createElement('span');rolledLabel.textContent='ROLLED';
+    const rolledLabel=document.createElement('span');rolledLabel.textContent='Rolled';
     const rolledValues=document.createElement('b');rolledValues.textContent=entry.faces.join(' · ');
     rolled.append(rolledLabel,rolledValues);
     const saved=document.createElement('p');saved.className='history-values saved-values';
-    const savedLabel=document.createElement('span');savedLabel.textContent='SAVED';
+    const savedLabel=document.createElement('span');savedLabel.textContent='Kept';
     const savedValues=document.createElement('b');savedValues.textContent=entry.saved.length?entry.saved.join(' · '):'—';
     saved.append(savedLabel,savedValues);item.append(heading,rolled,saved);return item;
   }));
@@ -260,16 +259,16 @@ function showLobby(mode='new',winner=null){
   phase='lobby';matchSerial++;
   ui.overlay.hidden=false;
   if(mode==='over'){
-    ui.overlayKicker.textContent=winner?.isHuman?'NICE RUN · TABLE WON':'MATCH COMPLETE';
-    ui.overlayTitle.textContent=winner?.isHuman?'You took the table.':`${winner?.name||'A bot'} wins.`;
-    ui.overlayCopy.textContent=`Final score: ${formatNumber(winner?.score||0)} · target ${formatNumber(matchTarget)}. Set up another table and take your luck for a second ride.`;
-    ui.lobbyFields.hidden=true;ui.lobbyAction.innerHTML='PLAY ANOTHER GAME <span>→</span>';
+    ui.overlayKicker.textContent='Game over';
+    ui.overlayTitle.textContent=winner?.isHuman?'You won':`${winner?.name||'A bot'} won`;
+    ui.overlayCopy.textContent=`Final score: ${formatNumber(winner?.score||0)} · Target: ${formatNumber(matchTarget)}`;
+    ui.lobbyFields.hidden=true;ui.lobbyAction.innerHTML='Play again <span>→</span>';
   }else{
-    ui.overlayKicker.textContent='LOCAL BOT LOBBY';ui.overlayTitle.textContent='One more roll?';
+    ui.overlayKicker.textContent='New game';ui.overlayTitle.textContent='Start a game';
     const requestedTarget=ui.targetSelect.value==='custom'?Number(ui.customTarget.value):Number(ui.targetSelect.value);
     const previewTarget=Number.isFinite(requestedTarget)&&requestedTarget>0?requestedTarget:matchTarget;
-    ui.overlayCopy.textContent=`Set the table, choose your dice skin, throw power and difficulty. First player to ${formatNumber(previewTarget)} points wins.`;
-    ui.lobbyFields.hidden=false;ui.lobbyAction.innerHTML='SEAT THE TABLE <span>→</span>';
+    ui.overlayCopy.textContent=`Choose players and options. First to ${formatNumber(previewTarget)} points wins.`;
+    ui.lobbyFields.hidden=false;ui.lobbyAction.innerHTML='Start game <span>→</span>';
   }
 }
 
@@ -325,9 +324,9 @@ function renderPlayers(){
   if(!players.length){ui.players.innerHTML='<li class="empty-player">Start a lobby to seat the table.</li>';return;}
   ui.players.replaceChildren(...players.map((player,index)=>{
     const li=document.createElement('li');li.className=`player-row${index===currentIndex?' active':''}`;
-    const avatar=document.createElement('span');avatar.className='player-avatar';avatar.textContent=player.isHuman?'✦':player.name.slice(0,1).toUpperCase();avatar.style.color=player.color;avatar.style.borderColor=player.color+'77';
+    const avatar=document.createElement('span');avatar.className='player-avatar';avatar.textContent=player.name.slice(0,1).toUpperCase();avatar.style.color=player.color;avatar.style.borderColor=player.color+'77';
     const name=document.createElement('span');name.className='player-name';name.textContent=player.name;
-    const sub=document.createElement('small');sub.textContent=player.isHuman?'YOU':'BOT';name.append(sub);
+    const sub=document.createElement('small');sub.textContent=player.isHuman?'You':'Bot';name.append(sub);
     const score=document.createElement('b');score.className='player-score';score.textContent=formatNumber(player.score);
     li.append(avatar,name,score);return li;
   }));
@@ -348,10 +347,10 @@ function setMessage(message,tone='') { ui.message.textContent=message;ui.message
 function updateTurnUI(){
   if(!players.length){updateControls();return;}
   const player=currentPlayer();
-  ui.turnName.textContent=player.name;ui.turnLabel.textContent=player.isHuman?`${player.name.toUpperCase()} · AT THE TABLE`:`${player.name.toUpperCase()} · BOT TURN`;
-  ui.phase.textContent=player.isHuman?'YOUR TURN':'BOT TURN';
+  ui.turnName.textContent=player.name;ui.turnLabel.textContent=player.isHuman?`${player.name} · Your turn`:`${player.name} · Bot turn`;
+  ui.phase.textContent=player.isHuman?'Your turn':'Bot turn';
   ui.turnScore.textContent=formatNumber(turnPoints);
-  ui.diceCount.textContent=`${activeIds.length} ${activeIds.length===1?'DIE':'DICE'} IN HAND`;
+  ui.diceCount.textContent=`${activeIds.length} ${activeIds.length===1?'die':'dice'}`;
   ui.round.textContent=String(round).padStart(2,'0');
   updateControls();
 }

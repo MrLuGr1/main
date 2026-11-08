@@ -51,11 +51,18 @@ export class AmbientPixels {
   constructor(canvas) {
     this.canvas=canvas;
     this.context=canvas.getContext('2d',{alpha:true});
-    this.pixels=[];this.pointer={x:-1000,y:-1000};this.width=0;this.height=0;
+    this.pixels=[];this.pointer={x:-1000,y:-1000,vx:0,vy:0,lastX:0,lastY:0,lastAt:0};this.width=0;this.height=0;
     this.palette=['#650000','#c30000','#b0aea8','#ffffff'];
     this.resize=()=>this.setSize();
     addEventListener('resize',this.resize,{passive:true});
-    addEventListener('pointermove',event=>{this.pointer.x=event.clientX;this.pointer.y=event.clientY;},{passive:true});
+    addEventListener('pointermove',event=>{
+      const now=performance.now(),x=event.clientX,y=event.clientY,elapsed=(now-this.pointer.lastAt)/1000;
+      if(elapsed>.001&&elapsed<.12){
+        this.pointer.vx=Math.max(-2200,Math.min(2200,(x-this.pointer.lastX)/elapsed));
+        this.pointer.vy=Math.max(-2200,Math.min(2200,(y-this.pointer.lastY)/elapsed));
+      }
+      this.pointer.x=x;this.pointer.y=y;this.pointer.lastX=x;this.pointer.lastY=y;this.pointer.lastAt=now;
+    },{passive:true});
     this.setSize();
   }
 
@@ -64,18 +71,25 @@ export class AmbientPixels {
     this.width=innerWidth;this.height=innerHeight;
     this.canvas.width=Math.round(this.width*ratio);this.canvas.height=Math.round(this.height*ratio);
     this.context.setTransform(ratio,0,0,ratio,0,0);
-    const count=Math.min(150,Math.max(65,Math.round(this.width*this.height/12000)));
-    this.pixels=Array.from({length:count},()=>({x:Math.random()*this.width,y:Math.random()*this.height,vx:(Math.random()-.5)*9,vy:(Math.random()-.5)*9,size:2+Math.floor(Math.random()*3),color:this.palette[Math.floor(Math.random()*this.palette.length)],phase:Math.random()*7}));
+    const count=Math.min(320,Math.max(130,Math.round(this.width*this.height/6500)));
+    this.pixels=Array.from({length:count},()=>({x:Math.random()*this.width,y:Math.random()*this.height,vx:(Math.random()-.5)*12,vy:(Math.random()-.5)*12,size:2+Math.floor(Math.random()*3),color:this.palette[Math.floor(Math.random()*this.palette.length)],phase:Math.random()*7}));
   }
 
   update(dt) {
     const ctx=this.context;ctx.clearRect(0,0,this.width,this.height);
     const now=performance.now();
+    const pointerSpeed=Math.min(1,Math.hypot(this.pointer.vx,this.pointer.vy)/1150);
     for(const pixel of this.pixels){
       const dx=pixel.x-this.pointer.x,dy=pixel.y-this.pointer.y,distance=Math.hypot(dx,dy)||1;
-      if(distance<145){const force=(1-distance/145)*48;pixel.vx+=dx/distance*force*dt;pixel.vy+=dy/distance*force*dt;}
-      pixel.vx+=(Math.sin(pixel.phase+now*.00025)*3-pixel.vx)*dt*.22;
-      pixel.vy+=(Math.cos(pixel.phase+now*.0002)*3-pixel.vy)*dt*.22;
+      if(distance<210){
+        const influence=1-distance/210,force=influence*(90+pointerSpeed*680);
+        pixel.vx+=(dx/distance*force+this.pointer.vx*.22*influence)*dt;
+        pixel.vy+=(dy/distance*force+this.pointer.vy*.22*influence)*dt;
+      }
+      pixel.vx+=(Math.sin(pixel.phase+now*.00025)*4-pixel.vx)*dt*.18;
+      pixel.vy+=(Math.cos(pixel.phase+now*.0002)*4-pixel.vy)*dt*.18;
+      const speed=Math.hypot(pixel.vx,pixel.vy);
+      if(speed>150){pixel.vx=pixel.vx/speed*150;pixel.vy=pixel.vy/speed*150;}
       pixel.x+=pixel.vx*dt;pixel.y+=pixel.vy*dt;
       if(pixel.x<-8)pixel.x=this.width+8;if(pixel.x>this.width+8)pixel.x=-8;
       if(pixel.y<-8)pixel.y=this.height+8;if(pixel.y>this.height+8)pixel.y=-8;
@@ -83,6 +97,7 @@ export class AmbientPixels {
       ctx.fillStyle=pixel.color;ctx.fillRect(Math.round(pixel.x),Math.round(pixel.y),pixel.size,pixel.size);
     }
     ctx.globalAlpha=1;
+    const decay=Math.exp(-dt*5.5);this.pointer.vx*=decay;this.pointer.vy*=decay;
   }
 }
 

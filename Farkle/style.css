@@ -8,8 +8,7 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;min-width:320px;min-height:100%;background:var(--black)}
-body{min-height:100vh;overflow-x:hidden;background:radial-gradient(ellipse at 48% -15%,#65000099 0,transparent 52%),linear-gradient(135deg,#000 10%,#650000 54%,#000 100%);background-size:180% 180%;animation:backdrop-drift 24s ease-in-out infinite alternate}
-@keyframes backdrop-drift{to{background-position:100% 100%}}
+body{min-height:100vh;overflow-x:hidden;background:#650000}
 button,input,select{font:inherit}button{color:inherit}button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid var(--red);outline-offset:3px}
 #ambient-pixels{position:fixed;inset:0;z-index:0;width:100%;height:100%;pointer-events:none;image-rendering:pixelated}
 .app-shell{position:relative;z-index:1;min-height:100vh;max-width:1860px;margin:0 auto;padding:0 28px;display:flex;flex-direction:column}
@@ -31,6 +30,63 @@ button,input,select{font:inherit}button{color:inherit}button:focus-visible,input
 @media(max-width:1050px){.app-shell{padding:0 18px}.game-layout{grid-template-columns:minmax(0,1fr) 310px;gap:13px}.table-card{padding:14px}.side-column{gap:9px}.panel{padding:13px}.turn-panel{padding:14px}.legend-tip{margin-left:0}}
 @media(max-width:790px){.topbar{height:64px;flex-basis:64px}.top-meta{gap:9px;font-size:10px}.game-layout{grid-template-columns:minmax(0,1fr) 280px;gap:10px}.table-wrap{min-height:360px}.table-card{gap:10px}.table-head h1{font-size:23px}.table-legend{gap:9px;font-size:10px}.player-row{padding:6px}.rules-content p{font-size:10px}}
 @media(max-width:640px){.app-shell{padding:0 11px}.topbar{height:58px;flex-basis:58px;gap:8px}.brand{min-width:0;gap:8px}.brand-mark{width:32px;height:32px;font-size:20px}.brand b{font-size:12px}.brand small{font-size:8px}.top-meta{margin-left:auto}.top-meta .top-separator,.top-meta>span:last-child{display:none}.quiet-button{height:33px;padding:0 8px;font-size:11px}.quiet-button span{display:none}.game-layout{display:flex;flex-direction:column;padding:10px 0;gap:12px}.table-card{padding:12px}.table-wrap{min-height:58vh;max-height:690px}.table-head h1{font-size:22px}.table-legend{font-size:9px}.legend-tip{width:100%}.side-column{display:grid;grid-template-columns:1fr;gap:10px}.players-panel{order:1}.turn-panel{order:0}.history-panel{order:2}.rules-panel{order:3}.connection-note{margin-top:0}.footer{font-size:8px;letter-spacing:.07em}.lobby-card{padding:22px 18px}.lobby-fields{grid-template-columns:1fr 1fr;gap:9px}.lobby-fields label{font-size:9px}.lobby-fields input,.lobby-fields select{height:39px;font-size:11px}.lobby-card h2{font-size:26px}.lobby-copy{font-size:12px}.lobby-art{height:70px}.die-art{width:47px;height:47px;font-size:28px}}
+
+/* Shared Pixel Desk typography and restrained panels; the felt remains the visual focus.
+   Direction pass guided by unslop, Damir Sokolovsky (https://heydamir.design/unslop), CC BY 4.0. */
+:root{--sans:'Trebuchet MS',Arial,sans-serif;--mono:'Lucida Console','Courier New',monospace}
+body{background:#650000;animation:none}
+.app-shell{background:rgb(0 0 0 / .5);border-inline:1px solid #b0aea84a}
+.table-card,.panel{background:rgb(0 0 0 / .5);box-shadow:0 4px 16px #00000055;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+.kept-tray-panel{background:rgb(0 0 0 / .5);box-shadow:4px 4px var(--maroon)}
+.offline-pill i{box-shadow:none}
+.kicker,.top-meta,.round-chip,.target-badge,.stats-strip span,.turn-total span,.history-heading,.history-values,.rules-panel summary,.rules-content p{letter-spacing:0}
+.kicker{font-size:12px}
+.table-head h1,.panel-heading h2,.turn-heading h2{letter-spacing:0;font-weight:500}
+.table-head h1 span{color:var(--white)}
+.top-meta,.round-chip,.target-badge{font-size:12px}
+.legend-dot.selected,.legend-dot.selected-blue{box-shadow:1px 1px var(--black)}
+.table-wrap{box-shadow:inset 0 0 32px #000000aa,4px 4px var(--maroon)}
+.table-wrap::before{box-shadow:none}
+.action-button{transition:background-color 160ms,border-color 160ms,color 160ms,transform 120ms}
+.action-button:hover:not(:disabled){transform:translateY(-1px);box-shadow:none}
+.screen-overlay{backdrop-filter:blur(2px)}
+.lobby-card{background:rgb(0 0 0 / .88);box-shadow:4px 4px var(--maroon);}
+.lobby-card>.kicker{text-align:left}
+.lobby-card h2{text-align:left;font-weight:500;letter-spacing:0}
+.lobby-copy{margin:0 0 16px;text-align:left;line-height:1.5}
+.lobby-fields{gap:12px}
+.lobby-fields label{font:13px var(--mono);letter-spacing:0}
+.lobby-fields input,.lobby-fields select{font-family:var(--sans)}
+.lobby-best{letter-spacing:0}
+.lobby-start{font-weight:500;letter-spacing:0;box-shadow:3px 3px var(--gray)}
+.lobby-start:hover{box-shadow:3px 3px var(--gray)}
+.lobby-foot{font:12px var(--sans);letter-spacing:0}
+.orbit{display:none}
+.connection-note{font-size:12px}
+.footer{display:none}
+.app-shell{padding:0 24px}
+.topbar{height:64px;flex-basis:64px;gap:16px}
+.brand{min-width:0;gap:12px}.brand-mark{width:36px;height:36px;font-size:20px;box-shadow:3px 3px var(--gray)}.brand b{font-weight:600;letter-spacing:0}.brand small{font-size:12px;letter-spacing:0}
+.top-meta{gap:16px;font-size:12px}
+.quiet-button{height:36px;padding:0 12px;box-shadow:2px 2px var(--maroon)}.quiet-button:hover{transform:translateY(-1px);box-shadow:2px 2px var(--maroon)}
+.game-layout{grid-template-columns:minmax(0,1fr) 340px;gap:16px;padding:16px 0}
+.table-card{padding:20px;gap:12px}
+.table-head h1{font-size:28px}
+.round-chip{padding:8px}
+.kept-tray-panel{padding:12px}
+.table-legend{gap:12px;font-size:12px}
+.side-column{gap:12px}.panel,.turn-panel,.history-panel{padding:16px}
+.panel-heading h2,.turn-heading h2{font-size:18px}
+.target-badge{padding:6px 8px}
+.player-list{margin:12px 0;gap:8px}.player-row{gap:8px;padding:8px}.player-name small{letter-spacing:0}.stats-strip span{font-size:12px}
+.turn-total{margin-top:12px;padding:12px}.turn-total span{font-size:12px}.action-stack{gap:8px;margin-top:12px}.action-button{min-height:44px;padding:0 12px;gap:8px}.action-button kbd{font-size:12px}
+.history-panel .roll-history{gap:8px;margin-top:12px}.history-item,.history-empty{padding:8px 12px}
+.rules-panel summary{padding:12px 16px}.rules-content{padding:0 16px 16px}.rules-content p{margin:8px 0}
+.screen-overlay{padding:16px;background:#000000b8;backdrop-filter:none}
+.lobby-card{width:min(640px,100%);padding:24px;border-width:1px;background:rgb(0 0 0 / .88);box-shadow:4px 4px var(--maroon)}
+.lobby-art{height:80px;margin:0 auto 12px}.lobby-card h2{margin:8px 0;font-size:28px}.lobby-fields{gap:12px}.lobby-fields label{gap:8px;font-size:13px}.lobby-fields input,.lobby-fields select{height:40px;padding:0 12px}.lobby-best{margin-top:16px;padding:12px}.lobby-start{height:44px;margin-top:12px;padding:0 12px;box-shadow:3px 3px var(--gray)}.lobby-start:hover{box-shadow:3px 3px var(--gray)}.lobby-foot{margin-top:12px}
+@media(max-width:790px){.app-shell{padding:0 16px}.game-layout{grid-template-columns:minmax(0,1fr) 300px;gap:12px;padding:12px 0}.table-card{padding:16px}.panel,.turn-panel,.history-panel{padding:12px}}
+@media(max-width:640px){.app-shell{padding:0 12px}.topbar{height:60px;flex-basis:60px;gap:8px}.brand{gap:8px}.brand-mark{width:32px;height:32px;font-size:18px}.brand b{font-size:12px}.brand small{font-size:10px}.quiet-button{height:36px;padding:0 8px}.game-layout{display:flex;flex-direction:column;gap:12px;padding:12px 0}.table-card{padding:12px}.table-wrap{min-height:58vh;max-height:690px}.table-head h1{font-size:22px}.table-legend{gap:8px;font-size:11px}.side-column{display:grid;grid-template-columns:1fr;gap:12px}.players-panel{order:1}.turn-panel{order:0}.history-panel{order:2}.rules-panel{order:3}.connection-note{margin-top:0}.lobby-card{padding:20px}.lobby-fields{grid-template-columns:1fr 1fr;gap:8px}.lobby-fields label{font-size:11px}.lobby-fields input,.lobby-fields select{height:40px;font-size:12px}.lobby-card h2{font-size:24px}.lobby-copy{font-size:13px}.lobby-art{height:64px}.die-art{width:44px;height:44px;font-size:26px}}
 @media(max-width:640px){.kept-tray-panel{padding:8px}.kept-dice-tray{gap:4px}.kept-slot{min-height:42px}.kept-slot-label{display:none}.kept-face{width:28px;height:28px;padding:4px;gap:1px}.kept-face i{max-width:5px;max-height:5px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 
