@@ -5,7 +5,11 @@ const DIE_SIZE = .9;
 const HALF = DIE_SIZE / 2;
 const GRAVITY = 19;
 const KEEP_SPACING = 1.7;
-const KEEP_CENTER = 7.4;
+export const BOARD_SCALE = 1.14;
+const BOARD_HALF_X = 5 * BOARD_SCALE;
+const BOARD_HALF_Z = 7.5 * BOARD_SCALE;
+const WALL_THICKNESS = .14;
+const KEEP_CENTER = 7.4 * BOARD_SCALE;
 function keptPosition(index) {
   // The diagonal row is outside the board in world space and its full
   // projection remains beyond the board silhouette in the isometric view.
@@ -79,9 +83,11 @@ export class DicePhysics {
       wall.addShape(new CANNON.Box(new CANNON.Vec3(halfX, 3, halfZ)));
       this.world.addBody(wall);
     };
-    // Physical bounds match the 100 × 150 cm rectangular table in game.js.
-    addWall(-4.88, 0, .12, 7.35); addWall(4.88, 0, .12, 7.35);
-    addWall(0, -7.35, 4.9, .12); addWall(0, 7.35, 4.9, .12);
+    // Tall collision walls align with the expanded 114 × 171 cm board in game.js.
+    const wallX=BOARD_HALF_X-WALL_THICKNESS;
+    const wallZ=BOARD_HALF_Z-WALL_THICKNESS;
+    addWall(-wallX, 0, WALL_THICKNESS, BOARD_HALF_Z); addWall(wallX, 0, WALL_THICKNESS, BOARD_HALF_Z);
+    addWall(0, -wallZ, BOARD_HALF_X, WALL_THICKNESS); addWall(0, wallZ, BOARD_HALF_X, WALL_THICKNESS);
   }
 
   addDie(id) {
@@ -99,12 +105,12 @@ export class DicePhysics {
 
   throwDice(ids, power = 'medium') {
     const strength = THROW_POWER[power] || THROW_POWER.medium;
-    const positions = [-3.85, -2.31, -.77, .77, 2.31, 3.85];
+    const positions = [-3.85, -2.31, -.77, .77, 2.31, 3.85].map(value=>value*BOARD_SCALE);
     ids.forEach((id, index) => {
       const body = this.bodies[id];
       this.stashTransitions.delete(id);
       body.type = CANNON.Body.DYNAMIC; body.mass = 1; body.updateMassProperties(); body.wakeUp();
-      body.position.set(positions[index % positions.length], 2.5 + Math.random() * .65, Math.random() * 4.6 - 2.3);
+      body.position.set(positions[index % positions.length], 2.5 + Math.random() * .65, (Math.random() * 4.6 - 2.3)*BOARD_SCALE);
       body.quaternion.setFromEuler(Math.random() * 6, Math.random() * 6, Math.random() * 6);
       // The lobby power scales the actual launch impulse/velocity, not just the animation.
       body.velocity.set((Math.random() - .5) * 4.5 * strength, (1 + Math.random() * 2.5) * strength, (Math.random() - .5) * 6.5 * strength);
@@ -124,12 +130,14 @@ export class DicePhysics {
       .map(body=>({x:body.position.x,z:body.position.z}));
     const resolved=new Map();
     const xSlots=[];const zSlots=[];
-    for(let x=-4.05;x<=4.051;x+=REST_GAP)xSlots.push(x);
-    for(let z=-6.4;z<=6.401;z+=REST_GAP)zSlots.push(z);
+    const xLimit=BOARD_HALF_X-(2*WALL_THICKNESS)-HALF-.05;
+    const zLimit=BOARD_HALF_Z-(2*WALL_THICKNESS)-HALF-.05;
+    for(let x=-xLimit;x<=xLimit+.001;x+=REST_GAP)xSlots.push(x);
+    for(let z=-zLimit;z<=zLimit+.001;z+=REST_GAP)zSlots.push(z);
     const order=[...ids].sort((a,b)=>this.bodies[a].position.y-this.bodies[b].position.y);
     for(const id of order){
       const body=this.bodies[id];
-      const original={x:Math.max(-4.05,Math.min(4.05,body.position.x)),z:Math.max(-6.4,Math.min(6.4,body.position.z))};
+      const original={x:Math.max(-xLimit,Math.min(xLimit,body.position.x)),z:Math.max(-zLimit,Math.min(zLimit,body.position.z))};
       const candidates=[original];
       for(const x of xSlots)for(const z of zSlots)candidates.push({x,z});
       candidates.sort((a,b)=>(a.x-original.x)**2+(a.z-original.z)**2-((b.x-original.x)**2+(b.z-original.z)**2));
