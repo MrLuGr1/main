@@ -1,8 +1,8 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
-import { DicePhysics, BOARD_SCALE, keptPosition } from './physics.js?v=20261108-3';
+import { DicePhysics, BOARD_SCALE, keptPosition } from './physics.js?v=20261108-4';
 import { findScoringOptions, scoreSelection } from './scoring.js';
 import { chooseBotMove, makePlayers } from './bot.js';
-import { ParticleEffects, ScoringFlames, AmbientPixels } from './effects.js?v=20261108-3';
+import { ParticleEffects, ScoringFlames, AmbientPixels } from './effects.js?v=20261108-4';
 
 const canvas = document.querySelector('#dice-table');
 const tableWrap = document.querySelector('#table-wrap');
@@ -541,8 +541,8 @@ function resize(){
       for(const y of [.012,.912])framePoints.push(new THREE.Vector3(x,y,z).applyMatrix4(camera.matrixWorldInverse));
     }
   }
-  // Derive perspective FOV from the projected board bounds, including the peak of a high throw.
-  const frameFill=.9;
+  // Zoom from the board center; keep its projected perimeter within 2% of the canvas edges.
+  const frameFill=.98;
   let requiredTan=.1;
   for(const point of framePoints){
     const depth=-point.z;
