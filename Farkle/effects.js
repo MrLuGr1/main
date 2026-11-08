@@ -46,13 +46,80 @@ export class ParticleEffects {
   }
 }
 
+/** Pixel sparks hover above every scoring die in Easy mode. */
+export class ScoringFlames {
+  constructor(scene, dieCount = 6) {
+    this.targets=Array(dieCount).fill(false);
+    this.enabled=false;
+    this.particlesPerDie=18;
+    const flameMap=this.createPixelMap();
+    this.groups=Array.from({length:dieCount},()=>{
+      const positions=new Float32Array(this.particlesPerDie*3);
+      const geometry=new THREE.BufferGeometry();
+      geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+      const material=new THREE.PointsMaterial({
+        color:'#808080',map:flameMap,size:8,sizeAttenuation:true,transparent:true,opacity:.5,
+        depthWrite:false,toneMapped:false,blending:THREE.CustomBlending,
+        // Destination-aware screen blend brightens dark pixels and shifts with the felt beneath it.
+        blendEquation:THREE.AddEquation,blendSrc:THREE.OneMinusDstColorFactor,blendDst:THREE.OneFactor,
+      });
+      const points=new THREE.Points(geometry,material);
+      points.frustumCulled=false;points.renderOrder=4;points.visible=false;scene.add(points);
+      return {
+        points,
+        particles:Array.from({length:this.particlesPerDie},()=>({
+          x:(Math.random()-.5)*.72,z:(Math.random()-.5)*.72,phase:Math.random(),speed:.72+Math.random()*.65,
+        })),
+      };
+    });
+    this.localPoint=new THREE.Vector3();
+  }
+
+  createPixelMap() {
+    const canvas=document.createElement('canvas');canvas.width=canvas.height=8;
+    const ctx=canvas.getContext('2d');
+    const rows=['...#....','..###...','.#####..','#######.','########','########','..####..','...##...'];
+    const colors=['#ffffff','#ffffff','#b0aea8','#c30000','#c30000','#650000','#c30000','#b0aea8'];
+    rows.forEach((row,y)=>[...row].forEach((pixel,x)=>{if(pixel==='#'){ctx.fillStyle=colors[y];ctx.fillRect(x,y,1,1);}}));
+    const texture=new THREE.CanvasTexture(canvas);
+    texture.colorSpace=THREE.SRGBColorSpace;
+    texture.magFilter=THREE.NearestFilter;texture.minFilter=THREE.NearestFilter;texture.generateMipmaps=false;
+    return texture;
+  }
+
+  setTargets(targets, enabled) {
+    this.enabled=enabled;
+    targets.forEach((target,index)=>{this.targets[index]=Boolean(target);});
+  }
+
+  update(meshes, _delta, time) {
+    this.groups.forEach((group,index)=>{
+      const mesh=meshes[index];
+      const visible=this.enabled&&this.targets[index]&&Boolean(mesh?.visible);
+      group.points.visible=visible;
+      if(!visible)return;
+      mesh.updateWorldMatrix(true,false);
+      const values=group.points.geometry.attributes.position.array;
+      group.particles.forEach((particle,particleIndex)=>{
+        const life=(time*particle.speed+particle.phase)%1;
+        this.localPoint.set(particle.x,.47,particle.z).applyMatrix4(mesh.matrixWorld);
+        const flicker=Math.sin(life*Math.PI*2+particle.phase*8)*.035;
+        values[particleIndex*3]=this.localPoint.x+flicker;
+        values[particleIndex*3+1]=this.localPoint.y+.08+life*.58;
+        values[particleIndex*3+2]=this.localPoint.z+Math.cos(life*Math.PI*2+particle.phase*8)*.035;
+      });
+      group.points.geometry.attributes.position.needsUpdate=true;
+    });
+  }
+}
+
 /** Full-window pixel field. Nearby pixels drift away from the pointer and softly return. */
 export class AmbientPixels {
   constructor(canvas) {
     this.canvas=canvas;
     this.context=canvas.getContext('2d',{alpha:true});
     this.pixels=[];this.pointer={x:-1000,y:-1000,vx:0,vy:0,lastX:0,lastY:0,lastAt:0};this.width=0;this.height=0;
-    this.palette=['#650000','#c30000','#b0aea8','#ffffff'];
+    this.palette=['#c30000','#b0aea8','#ffffff','#ffffff'];
     this.resize=()=>this.setSize();
     addEventListener('resize',this.resize,{passive:true});
     addEventListener('pointermove',event=>{
@@ -71,29 +138,29 @@ export class AmbientPixels {
     this.width=innerWidth;this.height=innerHeight;
     this.canvas.width=Math.round(this.width*ratio);this.canvas.height=Math.round(this.height*ratio);
     this.context.setTransform(ratio,0,0,ratio,0,0);
-    const count=Math.min(320,Math.max(130,Math.round(this.width*this.height/6500)));
-    this.pixels=Array.from({length:count},()=>({x:Math.random()*this.width,y:Math.random()*this.height,vx:(Math.random()-.5)*12,vy:(Math.random()-.5)*12,size:2+Math.floor(Math.random()*3),color:this.palette[Math.floor(Math.random()*this.palette.length)],phase:Math.random()*7}));
+    const count=Math.min(760,Math.max(300,Math.round(this.width*this.height/3200)));
+    this.pixels=Array.from({length:count},()=>({x:Math.random()*this.width,y:Math.random()*this.height,vx:(Math.random()-.5)*26,vy:(Math.random()-.5)*26,size:3+Math.floor(Math.random()*4),color:this.palette[Math.floor(Math.random()*this.palette.length)],phase:Math.random()*7}));
   }
 
   update(dt) {
     const ctx=this.context;ctx.clearRect(0,0,this.width,this.height);
     const now=performance.now();
-    const pointerSpeed=Math.min(1,Math.hypot(this.pointer.vx,this.pointer.vy)/1150);
+    const pointerSpeed=Math.min(1,Math.hypot(this.pointer.vx,this.pointer.vy)/850);
     for(const pixel of this.pixels){
       const dx=pixel.x-this.pointer.x,dy=pixel.y-this.pointer.y,distance=Math.hypot(dx,dy)||1;
-      if(distance<210){
-        const influence=1-distance/210,force=influence*(90+pointerSpeed*680);
-        pixel.vx+=(dx/distance*force+this.pointer.vx*.22*influence)*dt;
-        pixel.vy+=(dy/distance*force+this.pointer.vy*.22*influence)*dt;
+      if(distance<270){
+        const influence=1-distance/270,force=influence*(220+pointerSpeed*1250);
+        pixel.vx+=(dx/distance*force+this.pointer.vx*.32*influence)*dt;
+        pixel.vy+=(dy/distance*force+this.pointer.vy*.32*influence)*dt;
       }
-      pixel.vx+=(Math.sin(pixel.phase+now*.00025)*4-pixel.vx)*dt*.18;
-      pixel.vy+=(Math.cos(pixel.phase+now*.0002)*4-pixel.vy)*dt*.18;
+      pixel.vx+=(Math.sin(pixel.phase+now*.00045)*10-pixel.vx)*dt*.11;
+      pixel.vy+=(Math.cos(pixel.phase+now*.0004)*10-pixel.vy)*dt*.11;
       const speed=Math.hypot(pixel.vx,pixel.vy);
-      if(speed>150){pixel.vx=pixel.vx/speed*150;pixel.vy=pixel.vy/speed*150;}
+      if(speed>300){pixel.vx=pixel.vx/speed*300;pixel.vy=pixel.vy/speed*300;}
       pixel.x+=pixel.vx*dt;pixel.y+=pixel.vy*dt;
       if(pixel.x<-8)pixel.x=this.width+8;if(pixel.x>this.width+8)pixel.x=-8;
       if(pixel.y<-8)pixel.y=this.height+8;if(pixel.y>this.height+8)pixel.y=-8;
-      ctx.globalAlpha=.13+.16*(.5+.5*Math.sin(now*.001+pixel.phase));
+      ctx.globalAlpha=.42+.32*(.5+.5*Math.sin(now*.0016+pixel.phase));
       ctx.fillStyle=pixel.color;ctx.fillRect(Math.round(pixel.x),Math.round(pixel.y),pixel.size,pixel.size);
     }
     ctx.globalAlpha=1;
