@@ -2,7 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.m
 import { DicePhysics, BOARD_SCALE, keptPosition } from './physics.js?v=20261108-4';
 import { findScoringOptions, scoreSelection } from './scoring.js';
 import { chooseBotMove, makePlayers } from './bot.js';
-import { ParticleEffects, ScoringFlames, AmbientPixels } from './effects.js?v=20261108-5';
+import { ParticleEffects, ScoringFlames, AmbientPixels } from './effects.js?v=20261108-6';
 
 const canvas = document.querySelector('#dice-table');
 const tableWrap = document.querySelector('#table-wrap');
@@ -426,7 +426,7 @@ function keepSelected(automatic=false){
   renderKeptTray();
   activeIds=activeIds.filter(id=>!selectedIds.has(id));
   selectedIds.clear();selectedResult={valid:false,points:0};
-  updateTurnUI();
+  setDieHighlights();updateTurnUI();
   setMessage(`${player.name} keeps ${formatNumber(points)} points. Turn total: ${formatNumber(turnPoints)}.`, 'good');
 
   if(activeIds.length===0){
