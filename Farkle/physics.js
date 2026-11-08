@@ -58,6 +58,8 @@ export class DicePhysics {
     this.world.broadphase = new CANNON.NaiveBroadphase();
     this.world.solver.iterations = 16;
     this.world.solver.tolerance = .001;
+    this.fixedTimeStep=1/60;
+    this.accumulator=0;
     this.diceMaterial = new CANNON.Material('ivory-dice');
     this.tableMaterial = new CANNON.Material('felt-table');
     this.world.defaultContactMaterial.friction = .38;
@@ -116,6 +118,7 @@ export class DicePhysics {
       body.angularVelocity.set((Math.random() - .5) * 18 * spin, (Math.random() - .5) * 17 * spin, (Math.random() - .5) * 18 * spin);
       body.force.setZero(); body.torque.setZero(); body.aabbNeedsUpdate = true;
     });
+    this.accumulator=0;
     this.roll = { ids: [...ids], elapsed: 0, targets: null };
   }
 
@@ -148,10 +151,21 @@ export class DicePhysics {
   /** Advance the physical animation. Returns a face map once the two-second throw has settled. */
   step(delta) {
     if (!this.roll) return null;
-    const remaining = Math.max(0, 2 - this.roll.elapsed);
-    const step = Math.min(delta, remaining);
-    this.world.step(1 / 120, step, 12);
-    this.roll.elapsed += step;
+    this.accumulator+=Math.max(0,Math.min(delta,.25));
+    while(this.accumulator+1e-10>=this.fixedTimeStep&&this.roll){
+      this.accumulator-=this.fixedTimeStep;
+      const result=this.stepFixed();
+      if(result)return result;
+    }
+    return null;
+  }
+
+  /** Run one deterministic Cannon tick; render-frame delta never changes the physics step. */
+  stepFixed() {
+    if(!this.roll)return null;
+    const step=this.fixedTimeStep;
+    this.world.step(this.fixedTimeStep);
+    this.roll.elapsed=Math.min(2,this.roll.elapsed+step);
     if (this.roll.elapsed >= 1.68 && !this.roll.targets) {
       const landing=this.resolveLandingPositions(this.roll.ids);
       this.roll.targets = new Map(this.roll.ids.map(id => {
