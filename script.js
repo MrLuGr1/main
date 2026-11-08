@@ -621,7 +621,6 @@
       isAdmin = true;
       applyAdminMode();
       render();
-      markCloudflareSync();
       showToast('Správcovská relace byla obnovena.');
     } catch (error) {
       // Keep a locally unexpired signed token for this tab; the Worker will still
