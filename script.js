@@ -2,6 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'pixel-desk-projects-v1';
+  const DELETED_IDS_KEY = 'pixel-desk-deleted-ids-v1';
   // This URL is public configuration, not a secret. Passwords and session tokens never go in source control.
   const API_BASE = (document.querySelector('meta[name="pixel-desk-api"]')?.content || '').trim().replace(/\/$/, '');
   const REMOVED_BUILTIN_IDS = new Set(['dos-tools-folder', 'dos-penetration-test', 'dos-request-spammer']);
@@ -70,13 +71,28 @@
   }
   document.querySelectorAll('[data-pixel-icon]').forEach(element => element.replaceChildren(pixelIcon(element.dataset.pixelIcon)));
 
+  function readDeletedProjectIds() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(DELETED_IDS_KEY) || '[]');
+      return new Set(Array.isArray(saved) ? saved.filter(id => typeof id === 'string') : []);
+    } catch { return new Set(); }
+  }
+
+  function rememberDeletedProject(id) {
+    const deleted = readDeletedProjectIds();
+    deleted.add(id);
+    try { localStorage.setItem(DELETED_IDS_KEY, JSON.stringify([...deleted])); }
+    catch (error) { console.warn('Odstranění se nepodařilo uložit do místní ochrany seznamu.', error); }
+  }
+
   function readProjects() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved !== null) {
         const projects = JSON.parse(saved);
         if (Array.isArray(projects)) {
-          const retained = projects.filter(project => !REMOVED_BUILTIN_IDS.has(project?.id) && !isRemovedDemoProject(project));
+          const deletedIds = readDeletedProjectIds();
+          const retained = projects.filter(project => !deletedIds.has(project?.id) && !REMOVED_BUILTIN_IDS.has(project?.id) && !isRemovedDemoProject(project));
           if (retained.length !== projects.length) {
             try { localStorage.setItem(STORAGE_KEY, JSON.stringify(retained)); } catch { /* The visible list is still cleaned for this session. */ }
           }
@@ -141,7 +157,8 @@
       const result = await apiRequest('/api/projects');
       // A slower initial GET must never undo a newer add/edit/delete response.
       if (requestRevision !== projectStateRevision) return;
-      const custom = Array.isArray(result.projects) ? result.projects.filter(isValidProject) : [];
+      const deletedIds = readDeletedProjectIds();
+      const custom = Array.isArray(result.projects) ? result.projects.filter(project => !deletedIds.has(project?.id) && isValidProject(project)) : [];
       projects = [...starterProjects, ...custom];
       saveProjects();
       render();
@@ -260,6 +277,7 @@
         remove.disabled = true;
         try {
           const result = await apiRequest(`/api/projects/${encodeURIComponent(project.id)}`, { method: 'DELETE' });
+          rememberDeletedProject(project.id);
           projectStateRevision += 1;
           projects = Array.isArray(result.projects)
             ? [...starterProjects, ...result.projects.filter(isValidProject)]
@@ -269,6 +287,7 @@
           showToast('Projekt byl odebrán ze sdíleného seznamu.');
         } catch (error) {
           if (error.status === 404) {
+            rememberDeletedProject(project.id);
             // The backend is already authoritative: remove stale UI even if another
             // tab or an earlier request deleted this item first.
             projectStateRevision += 1;
@@ -779,6 +798,24 @@
     );
   }
   document.querySelector('#weather-refresh').addEventListener('click', requestLocalWeather);
+
+  // Refresh when the visitor grants geolocation, then keep local weather current.
+  if (navigator.permissions?.query) {
+    navigator.permissions.query({ name: 'geolocation' }).then(permission => {
+      let refreshTimer;
+      const syncPermission = () => {
+        if (permission.state === 'granted') {
+          requestLocalWeather();
+          if (!refreshTimer) refreshTimer = setInterval(requestLocalWeather, 15 * 60 * 1000);
+        } else if (refreshTimer) {
+          clearInterval(refreshTimer);
+          refreshTimer = undefined;
+        }
+      };
+      permission.addEventListener('change', syncPermission);
+      if (permission.state === 'granted') syncPermission();
+    }).catch(() => { /* Geolocation still works through the refresh button. */ });
+  }
 
   // Low-resolution layers are painted once per resize/theme change. Only their
   // offsets change during parallax; no continuous animation runs while idle.
