@@ -564,12 +564,15 @@
     }, remaining);
   }
 
-  function startAdminSession(token, lifetimeSeconds = 30 * 60) {
+  function startAdminSession(token, serverExpiresAt, lifetimeSeconds = 30 * 60) {
     const startedAt = Date.now();
     adminToken = token;
     isAdmin = true;
     const serverTtl = Number.isFinite(Number(lifetimeSeconds)) ? Number(lifetimeSeconds) * 1000 : ADMIN_SESSION_TTL_MS;
-    adminSessionExpiresAt = startedAt + Math.min(ADMIN_SESSION_TTL_MS, serverTtl);
+    const clientLimit = startedAt + Math.min(ADMIN_SESSION_TTL_MS, serverTtl);
+    adminSessionExpiresAt = Number.isFinite(Number(serverExpiresAt)) && Number(serverExpiresAt) > startedAt
+      ? Math.min(clientLimit, Number(serverExpiresAt))
+      : clientLimit;
     try {
       sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify({ startedAt, expiresAt: adminSessionExpiresAt, token }));
     } catch { /* Session remains protected by its in-memory expiry and the Worker token expiry. */ }
@@ -600,7 +603,9 @@
         cache: 'no-store',
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok || payload.valid !== true || Date.now() >= adminSessionExpiresAt) {
+      const serverExpiresAt = Number(payload.expiresAt);
+      const validatedExpiry = Number.isFinite(serverExpiresAt) ? Math.min(adminSessionExpiresAt, serverExpiresAt) : 0;
+      if (!response.ok || payload.valid !== true || validatedExpiry <= Date.now()) {
         clearAdminSession();
         adminToken = '';
         isAdmin = false;
@@ -608,6 +613,11 @@
         render();
         return;
       }
+      adminSessionExpiresAt = validatedExpiry;
+      try {
+        sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify({ startedAt: saved.startedAt, expiresAt: validatedExpiry, token: saved.token }));
+      } catch { /* Server-side expiry validation remains authoritative. */ }
+      scheduleAdminSessionExpiry();
       isAdmin = true;
       applyAdminMode();
       render();
@@ -759,7 +769,7 @@
     try {
       const result = await apiRequest('/api/login', { method: 'POST', body: JSON.stringify({ password: adminPassword.value }) });
       if (typeof result.token !== 'string' || !result.token) throw new Error('Server nevrátil platnou relaci.');
-      startAdminSession(result.token, result.expiresIn);
+      startAdminSession(result.token, result.expiresAt, result.expiresIn);
       adminPassword.value = '';
       adminDialog.close();
       applyAdminMode();

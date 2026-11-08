@@ -52,8 +52,19 @@ async function signPayload(payload, secret) {
 }
 
 async function makeSession(env) {
-  const payload = base64Url(encoder.encode(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS })));
-  return `${payload}.${await signPayload(payload, env.SESSION_SECRET)}`;
+  const exp = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
+  const payload = base64Url(encoder.encode(JSON.stringify({ exp })));
+  return { token: `${payload}.${await signPayload(payload, env.SESSION_SECRET)}`, expiresAt: exp * 1000 };
+}
+
+function sessionExpiry(request) {
+  try {
+    const token = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '') || '';
+    const payload = token.split('.')[0];
+    const decoded = new TextDecoder().decode(base64ToBytes(payload.replaceAll('-', '+').replaceAll('_', '/') + '='.repeat((4 - payload.length % 4) % 4)));
+    const exp = JSON.parse(decoded).exp;
+    return Number.isInteger(exp) ? exp * 1000 : 0;
+  } catch { return 0; }
 }
 
 async function isAuthenticated(request, env) {
@@ -218,11 +229,12 @@ export default {
         const password = typeof body.password === 'string' ? body.password : '';
         const digest = await sha256Hex(password);
         if (!safeEqual(digest, env.ADMIN_PASSWORD_SHA256.toLowerCase())) return responseJson({ error: 'Heslo není správné.' }, 401, cors);
-        return responseJson({ token: await makeSession(env), expiresIn: SESSION_TTL_SECONDS }, 200, cors);
+        const session = await makeSession(env);
+        return responseJson({ ...session, expiresIn: SESSION_TTL_SECONDS }, 200, cors);
       }
       if (url.pathname === '/api/session' && request.method === 'GET') {
         if (!await isAuthenticated(request, env)) return responseJson({ error: 'Přihlášení vypršelo. Přihlas se znovu.' }, 401, cors);
-        return responseJson({ valid: true }, 200, cors);
+        return responseJson({ valid: true, expiresAt: sessionExpiry(request) }, 200, cors);
       }
       if (url.pathname === '/api/logout' && request.method === 'POST') {
         return responseJson({ ok: true }, 200, cors);
