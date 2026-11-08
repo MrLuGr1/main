@@ -46,14 +46,13 @@ export class ParticleEffects {
   }
 }
 
-/** Square pixel columns fall vertically above selectable dice in Easy mode. */
+/** Retro pixel flames fall vertically above selectable dice in Easy mode. */
 export class ScoringFlames {
   constructor(dieMeshes) {
     this.targets=Array(dieMeshes.length).fill(false);
     this.enabled=false;
-    this.particlesPerDie=16;
+    this.particlesPerDie=18;
     this.pixelMap=this.createPixelMap();
-    this.palette=['#ffffff','#b0aea8','#c30000','#650000'];
     this.bounds={minX:0,maxX:0,minZ:0,maxZ:0,maxY:0};
     this.corner=new THREE.Vector3();
     this.groups=dieMeshes.map(mesh=>{
@@ -61,16 +60,13 @@ export class ScoringFlames {
       const bounds=mesh.geometry.boundingBox;
       const size=bounds.getSize(new THREE.Vector3());
       const positions=new Float32Array(this.particlesPerDie*3);
-      const colors=new Float32Array(this.particlesPerDie*3);
       const geometry=new THREE.BufferGeometry();
       geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
-      geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
       const material=new THREE.PointsMaterial({
-        color:'#ffffff',vertexColors:true,map:this.pixelMap,size:.17,sizeAttenuation:true,transparent:true,opacity:.5,
+        color:'#808080',map:this.pixelMap,size:.22,sizeAttenuation:true,transparent:true,opacity:.5,
         depthWrite:false,toneMapped:false,blending:THREE.CustomBlending,
-        // Difference-style destination blending makes each square invert its backdrop.
-        blendEquation:THREE.AddEquation,blendSrc:THREE.OneMinusDstColorFactor,blendDst:THREE.OneMinusSrcColorFactor,
-        blendEquationAlpha:THREE.AddEquation,blendSrcAlpha:THREE.OneFactor,blendDstAlpha:THREE.OneMinusSrcAlphaFactor,
+        // Restore the original destination-aware pixel-flame blend.
+        blendEquation:THREE.AddEquation,blendSrc:THREE.OneMinusDstColorFactor,blendDst:THREE.OneFactor,
       });
       const points=new THREE.Points(geometry,material);
       points.frustumCulled=false;points.renderOrder=4;points.visible=false;
@@ -78,19 +74,18 @@ export class ScoringFlames {
       points.userData.sourceDie=mesh;
       mesh.parent.add(points);
       const particles=Array.from({length:this.particlesPerDie},(_,index)=>{
-        const color=new THREE.Color(this.palette[index%this.palette.length]);
-        colors[index*3]=color.r;colors[index*3+1]=color.g;colors[index*3+2]=color.b;
-        return {x:(Math.random()-.5)*size.x*.5,z:(Math.random()-.5)*size.z*.5,phase:Math.random(),speed:.62+Math.random()*.55};
+        return {x:(Math.random()-.5)*size.x*.38,z:(Math.random()-.5)*size.z*.38,phase:Math.random(),speed:.72+Math.random()*.65};
       });
-      geometry.attributes.color.needsUpdate=true;
       return {points,mesh,particles};
     });
   }
 
   createPixelMap() {
-    const canvas=document.createElement('canvas');canvas.width=canvas.height=4;
+    const canvas=document.createElement('canvas');canvas.width=canvas.height=8;
     const ctx=canvas.getContext('2d');
-    ctx.fillStyle='#ffffff';ctx.fillRect(0,0,4,4);
+    const rows=['...#....','..###...','.#####..','#######.','########','########','..####..','...##...'];
+    const colors=['#ffffff','#ffffff','#b0aea8','#c30000','#c30000','#650000','#c30000','#b0aea8'];
+    rows.forEach((row,y)=>[...row].forEach((pixel,x)=>{if(pixel==='#'){ctx.fillStyle=colors[y];ctx.fillRect(x,y,1,1);}}));
     const texture=new THREE.CanvasTexture(canvas);
     texture.colorSpace=THREE.SRGBColorSpace;
     texture.magFilter=THREE.NearestFilter;texture.minFilter=THREE.NearestFilter;texture.generateMipmaps=false;
@@ -127,10 +122,10 @@ export class ScoringFlames {
       const values=group.points.geometry.attributes.position.array;
       group.particles.forEach((particle,particleIndex)=>{
         const life=(time*particle.speed+particle.phase)%1;
-        // X/Z remain fixed for each pixel; only world Y changes from above the die downward.
-        values[particleIndex*3]=centerX+particle.x;
+        const flicker=Math.sin(life*Math.PI*2+particle.phase*8)*.035;
+        values[particleIndex*3]=centerX+particle.x+flicker;
         values[particleIndex*3+1]=bounds.maxY+.78-life*.7;
-        values[particleIndex*3+2]=centerZ+particle.z;
+        values[particleIndex*3+2]=centerZ+particle.z+Math.cos(life*Math.PI*2+particle.phase*8)*.035;
       });
       group.points.geometry.attributes.position.needsUpdate=true;
     });
