@@ -1,16 +1,16 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
-import { DicePhysics } from './physics.js';
+import { DicePhysics, BOARD_SCALE } from './physics.js';
 import { findScoringOptions, scoreSelection } from './scoring.js';
 import { chooseBotMove, makePlayers } from './bot.js';
-import { ParticleEffects, AmbientPixels } from './effects.js?v=20261108-1';
+import { ParticleEffects, ScoringFlames, AmbientPixels } from './effects.js?v=20261108-2';
 
 const canvas = document.querySelector('#dice-table');
 const tableWrap = document.querySelector('#table-wrap');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#000000');
 const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, .1, 80);
-// Fixed isometric orbit: 35° above the table, 45° around its diagonal.
-const ISO_ELEVATION = THREE.MathUtils.degToRad(35);
+// Fixed low isometric view: 15° above the table, 45° around its diagonal.
+const ISO_ELEVATION = THREE.MathUtils.degToRad(15);
 const ISO_AZIMUTH = THREE.MathUtils.degToRad(45);
 const cameraRadius = 28;
 camera.position.set(
@@ -41,8 +41,8 @@ const keyLight = new THREE.DirectionalLight('#ffffff', 3.2);
 keyLight.position.set(-3, 16, -5);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(1024, 1024);
-keyLight.shadow.camera.left = -12; keyLight.shadow.camera.right = 12;
-keyLight.shadow.camera.top = 12; keyLight.shadow.camera.bottom = -12;
+keyLight.shadow.camera.left = -15; keyLight.shadow.camera.right = 15;
+keyLight.shadow.camera.top = 15; keyLight.shadow.camera.bottom = -15;
 keyLight.shadow.bias = -.0007;
 scene.add(keyLight);
 const fillLight = new THREE.PointLight('#c30000', 18, 22, 2);
@@ -63,7 +63,6 @@ function canvasTexture(draw) {
 
 const PALETTE = { black: '#000000', maroon: '#650000', white: '#ffffff', red: '#c30000', gray: '#b0aea8' };
 const SELECTION_GREEN = '#00ff72';
-const SELECTION_BLUE = '#28a8ff';
 const SKINS = {
   basic:  { base: PALETTE.gray, trim: PALETTE.white, pip: PALETTE.black, pattern: 'edge', pulse: false },
   aurora: { base: PALETTE.black, trim: PALETTE.white, pip: PALETTE.red, pattern: 'aurora', pulse: true },
@@ -126,16 +125,6 @@ function relativeLuminance(hex){
   const rgb=hex.match(/[\da-f]{2}/gi).map(part=>parseInt(part,16)/255).map(channel=>channel<=.04045?channel/12.92:((channel+.055)/1.055)**2.4);
   return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2];
 }
-function contrastRatio(first,second){
-  const a=relativeLuminance(first),b=relativeLuminance(second);
-  return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
-}
-function guideColorForSkin(skinId){
-  const base=(SKINS[skinId]||SKINS.basic).base;
-  if(contrastRatio(PALETTE.red,base)>=3)return PALETTE.red;
-  return relativeLuminance(base)>.179?PALETTE.black:PALETTE.white;
-}
-
 const tableCanvasTexture = canvasTexture((ctx, size) => {
   ctx.fillStyle = PALETTE.black; ctx.fillRect(0,0,size,size);
   ctx.fillStyle = PALETTE.maroon;
@@ -144,12 +133,14 @@ const tableCanvasTexture = canvasTexture((ctx, size) => {
   ctx.strokeStyle=PALETTE.red;ctx.lineWidth=2;ctx.strokeRect(20,20,size-40,size-40);
   ctx.fillStyle=PALETTE.white;ctx.font='bold 36px monospace';ctx.textAlign='center';ctx.fillText('FARKLE / CLUB',size/2,size*.79);
 });
-const tableBase = new THREE.Mesh(new THREE.BoxGeometry(10,.78,15), new THREE.MeshStandardMaterial({ color:PALETTE.black, roughness:.52, metalness:.16 }));
+const BOARD_WIDTH=10*BOARD_SCALE;
+const BOARD_LENGTH=15*BOARD_SCALE;
+const tableBase = new THREE.Mesh(new THREE.BoxGeometry(BOARD_WIDTH,.78,BOARD_LENGTH), new THREE.MeshStandardMaterial({ color:PALETTE.black, roughness:.52, metalness:.16 }));
 tableBase.position.y=-.33; tableBase.receiveShadow=true; tableBase.castShadow=true; scene.add(tableBase);
-const felt = new THREE.Mesh(new THREE.PlaneGeometry(9.6,14.6),new THREE.MeshStandardMaterial({map:tableCanvasTexture,roughness:.95}));
+const felt = new THREE.Mesh(new THREE.PlaneGeometry(9.6*BOARD_SCALE,14.6*BOARD_SCALE),new THREE.MeshStandardMaterial({map:tableCanvasTexture,roughness:.95}));
 felt.rotation.x=-Math.PI/2;felt.position.y=.002;felt.receiveShadow=true;scene.add(felt);
 const railMaterial=new THREE.MeshStandardMaterial({color:PALETTE.red,roughness:.43,metalness:.12});
-for(const [x,z,sx,sz] of [[0,-7.37,10,.18],[0,7.37,10,.18],[-4.87,0,.18,15],[4.87,0,.18,15]]){
+for(const [x,z,sx,sz] of [[0,-7.37*BOARD_SCALE,BOARD_WIDTH,.18],[0,7.37*BOARD_SCALE,BOARD_WIDTH,.18],[-4.87*BOARD_SCALE,0,.18,BOARD_LENGTH],[4.87*BOARD_SCALE,0,.18,BOARD_LENGTH]]){
   const rail=new THREE.Mesh(new THREE.BoxGeometry(sx,.16,sz),railMaterial);rail.position.set(x,.055,z);rail.castShadow=true;scene.add(rail);
 }
 const physics = new DicePhysics(6);
@@ -158,13 +149,12 @@ const dice = Array.from({ length:6 },(_,id)=>{
   mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData.dieId=id;mesh.visible=false;scene.add(mesh);
   const ring=new THREE.Mesh(new THREE.RingGeometry(.56,.7,4),new THREE.MeshBasicMaterial({color:PALETTE.gray,transparent:true,opacity:.9,side:THREE.DoubleSide,depthWrite:false}));
   ring.rotation.x=-Math.PI/2;ring.position.y=.028;ring.visible=false;scene.add(ring);
-  const guide=new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry),new THREE.LineBasicMaterial({color:PALETTE.red,transparent:true,opacity:.55,depthWrite:false}));
-  guide.scale.setScalar(1.045);guide.visible=false;scene.add(guide);
-  const selectedLayer=new THREE.Mesh(mesh.geometry,new THREE.MeshBasicMaterial({color:SELECTION_GREEN,transparent:true,opacity:.34,side:THREE.DoubleSide,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1}));
+  const selectedLayer=new THREE.Mesh(mesh.geometry,new THREE.MeshBasicMaterial({color:SELECTION_GREEN,transparent:true,opacity:.38,side:THREE.DoubleSide,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1}));
   selectedLayer.scale.setScalar(1.018);selectedLayer.visible=false;selectedLayer.renderOrder=3;scene.add(selectedLayer);
-  return {id,face:0,mesh,ring,guide,selectedLayer,kept:false};
+  return {id,face:0,mesh,ring,selectedLayer,kept:false};
 });
 const effects = new ParticleEffects(scene);
+const scoringFlames = new ScoringFlames(scene, dice.length);
 const ambient = new AmbientPixels(document.querySelector('#ambient-pixels'));
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
@@ -309,7 +299,7 @@ function applySkin(skinId){
   const oldFaces=new Set(dieMaterials);
   for(const material of oldFaces){material.map?.dispose();material.dispose();}
   dieMaterials=next;activeSkin=skinId;
-  dice.forEach(die=>{die.mesh.material=dieMaterials;die.guide.material.color.set(guideColorForSkin(skinId));});
+  dice.forEach(die=>{die.mesh.material=dieMaterials;});
   try{localStorage.setItem('farkle-club-die-skin',skinId);}catch{/* Keep the in-memory choice for this visit. */}
 }
 
@@ -336,7 +326,7 @@ function beginTurn(){
   if(!players.length)return;
   currentHistoryEntry=null;
   phase='waiting';turnPoints=0;keptIds=[];activeIds=[0,1,2,3,4,5];selectedIds.clear();selectedResult={valid:false,points:0};botChoice=null;
-  dice.forEach(die=>{die.face=0;die.kept=false;die.mesh.visible=true;die.ring.visible=false;die.guide.visible=false;die.ring.material.color.set(PALETTE.white);});
+  dice.forEach(die=>{die.face=0;die.kept=false;die.mesh.visible=true;die.ring.visible=false;die.ring.material.color.set(PALETTE.white);});
   renderKeptTray();renderPlayers();updateTurnUI();
   const player=currentPlayer();
   setMessage(player.isHuman?'Your hand is ready. Every throw takes 2 seconds.':`${player.name} is getting ready to roll…`);
@@ -371,32 +361,18 @@ function updateControls(){
 function setDieHighlights(){
   const options=phase==='selecting'?findScoringOptions(activeIds.map(id=>dice[id])):[];
   const possible=new Set(options.flatMap(option=>option.indices.map(index=>activeIds[index])));
-  const selectedFaces=new Map();
-  if(selectedResult.valid){
-    for(const id of selectedIds){const face=dice[id].face;selectedFaces.set(face,[...(selectedFaces.get(face)||[]),id]);}
-  }
   for(const die of dice){
     const selected=selectedIds.has(die.id);
     const valid=possible.has(die.id);
-    const guideVisible=die.mesh.visible&&difficulty==='easy'&&phase==='selecting'&&currentPlayer()?.isHuman&&valid;
-    die.guide.visible=guideVisible;
-    die.guide.position.copy(die.mesh.position);die.guide.quaternion.copy(die.mesh.quaternion);
-    const match=selectedFaces.get(die.face)||[];
-    const isMultipleLead=match.length>=3&&match[0]===die.id;
-    die.selectedLayer.visible=die.mesh.visible&&selected&&selectedResult.valid;
-    if(match.length>=3){
-      die.selectedLayer.material.color.set(isMultipleLead?SELECTION_GREEN:SELECTION_BLUE);
-      die.selectedLayer.material.opacity=isMultipleLead ? .42 : .3;
-    }else{
-      die.selectedLayer.material.color.set(SELECTION_GREEN);
-      die.selectedLayer.material.opacity=.34;
-    }
+    const isHumanTurn=currentPlayer()?.isHuman;
+    die.selectedLayer.visible=die.mesh.visible&&selected&&valid&&isHumanTurn;
     die.selectedLayer.position.copy(die.mesh.position);die.selectedLayer.quaternion.copy(die.mesh.quaternion);
     die.ring.visible=die.mesh.visible&&(die.kept||selected);
     die.ring.position.x=die.mesh.position.x;die.ring.position.z=die.mesh.position.z;
     die.ring.material.color.set(die.kept?PALETTE.gray:PALETTE.white);
     die.ring.material.opacity=selected ? .98 : die.kept ? .72 : 0;
   }
+  scoringFlames.setTargets(dice.map(die=>die.mesh.visible&&possible.has(die.id)),difficulty==='easy'&&phase==='selecting'&&Boolean(currentPlayer()?.isHuman));
 }
 
 function updateSelection(){
@@ -533,11 +509,7 @@ function onTableClick(event){
   const id=hit.object.userData.dieId;
   if(!activeIds.includes(id))return;
   if(selectedIds.has(id)){
-    const sameFace=[...selectedIds].filter(selectedId=>dice[selectedId].face===dice[id].face);
-    if(sameFace.length>=3&&sameFace[0]!==id){
-      // Clicking a blue mate promotes it to the green lead; clicking the lead again deselects it.
-      selectedIds=new Set([id,...[...selectedIds].filter(selectedId=>selectedId!==id)]);
-    }else selectedIds.delete(id);
+    selectedIds.delete(id);
   }else selectedIds.add(id);
   updateSelection();
 }
@@ -557,8 +529,8 @@ function resize(){
   if(rect.width<1||rect.height<1)return;
   renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.7));renderer.setSize(rect.width,rect.height,false);
   const aspect=rect.width/rect.height;
-  // The game board fills the canvas; kept dice use a separate DOM rail below it.
-  const halfHeight=Math.max(6.2,9.1/aspect);
+  // Fit the enlarged tabletop tightly while keeping its entire perimeter visible.
+  const halfHeight=Math.max(4.6,10.2/aspect);
   const halfWidth=halfHeight*aspect;
   camera.left=-halfWidth;camera.right=halfWidth;camera.top=halfHeight;camera.bottom=-halfHeight;camera.updateProjectionMatrix();
 }
@@ -577,6 +549,7 @@ function frame(){
   physics.sync(dice.map(die=>die.mesh));
   setDieHighlights();
   effects.update(dt);
+  scoringFlames.update(dice.map(die=>die.mesh),dt,performance.now()*.001);
   ambient.update(dt);
   const pulse=performance.now()*.001;
   if(SKINS[activeSkin].pulse){
