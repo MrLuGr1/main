@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#000000">
   <meta name="description" content="Farkle Club, a 3D dice game against bot opponents.">
   <title>Farkle Club — Dice game</title>
-  <link rel="stylesheet" href="style.css?v=20261108-4">
-  <script type="module" src="game.js?v=20261108-5"></script>
+  <link rel="stylesheet" href="style.css?v=20261108-5">
+  <script type="module" src="game.js?v=20261108-6"></script>
 </head>
 <body>
   <canvas id="ambient-pixels" aria-hidden="true"></canvas>
@@ -98,6 +98,7 @@
       <p class="lobby-foot">Dice settle in 2 seconds · select scoring dice</p>
     </section>
   </div>
+  <output class="performance-monitor" id="performance-monitor" aria-live="off">FPS — · calls —</output>
   <div class="toast" id="toast" aria-live="polite" role="status"></div>
   <noscript>This game needs JavaScript modules enabled.</noscript>
 </body>
