@@ -8,10 +8,10 @@
   const REMOVED_DEMO_IDS = new Set(['demo-1', 'demo-2', 'demo-3', 'demo-4', 'demo-5', 'demo-6']);
   const REMOVED_DEMO_NAMES = new Set(['portfolio', 'portfolio 2025', 'pixel garden', 'weather app', 'moodboard', 'study tracker', 'study stracker', 'tiny tools']);
   const categoryInfo = {
-    web: { label: 'Web & aplikace', icon: '🌐', iconClass: 'web' },
-    design: { label: 'Design', icon: '🎨', iconClass: 'design' },
-    code: { label: 'Vývoj', icon: '⌘', iconClass: 'code' },
-    other: { label: 'Ostatní', icon: '🪴', iconClass: 'other' },
+    web: { label: 'Web & aplikace', icon: 'web', iconClass: 'web' },
+    design: { label: 'Design', icon: 'design', iconClass: 'design' },
+    code: { label: 'Vývoj', icon: 'code', iconClass: 'code' },
+    other: { label: 'Ostatní', icon: 'folder', iconClass: 'other' },
   };
   const starterProjects = [];
   // Offline fallback only. When the shared API responds, projects.json is the source of truth,
@@ -42,6 +42,33 @@
   let faviconRequestId = 0;
   // Invalidates project-list requests that began before a successful mutation.
   let projectStateRevision = 0;
+
+  // One local SVG set: no icon fonts, emoji rendering differences or external requests.
+  function pixelIcon(kind) {
+    const paths = {
+      web: 'M3 4h18v16H3z M3 9h18 M7 6v1 M10 6v1 M7 13h10 M7 16h6',
+      folder: 'M3 7V4h7l3 3h8v13H3z M3 10h18',
+      design: 'M4 4h16v16H4z M4 15h4v-4h4v-4h8 M15 15h2v2h-2z',
+      code: 'M9 6L3 12l6 6 M15 6l6 6-6 6',
+      home: 'M3 11h3V8h3V5h6v3h3v3h3 M6 11v9h5v-6h2v6h5v-9',
+      star: 'M10 3h4v6h7v4h-4v7l-5-3-5 3v-7H3V9h7z',
+      sun: 'M8 8h8v8H8z M12 1v3 M12 20v3 M1 12h3 M20 12h3 M4 4l2 2 M18 18l2 2 M20 4l-2 2 M6 18l-2 2',
+      moon: 'M10 3H6v3H3v12h3v3h12v-3h3v-4h-7v-3h-4z',
+      lock: 'M7 10V4h10v6 M4 10h16v11H4z M12 14v3',
+    };
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('class', 'pixel-icon');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+    const path = document.createElementNS(svg.namespaceURI, 'path');
+    path.setAttribute('d', paths[kind] || paths.folder);
+    svg.append(path);
+    return svg;
+  }
+  document.querySelectorAll('[data-pixel-icon]').forEach(element => element.replaceChildren(pixelIcon(element.dataset.pixelIcon)));
 
   function readProjects() {
     try {
@@ -144,8 +171,8 @@
     grid.replaceChildren(...shown.map(makeCard));
     const empty = document.querySelector('#empty-state');
     empty.hidden = shown.length > 0;
-    document.querySelector('#empty-title').textContent = query || activeFilter !== 'all' ? 'Nic jsme nenašli.' : 'Tady je zatím volno.';
-    document.querySelector('#empty-copy').textContent = query || activeFilter !== 'all' ? 'Zkus změnit hledání nebo vybrat jinou kategorii.' : 'Přidej první projekt a dej svým nápadům domov.';
+    document.querySelector('#empty-title').textContent = query || activeFilter !== 'all' ? 'Žádné výsledky' : 'Žádné projekty';
+    document.querySelector('#empty-copy').textContent = query || activeFilter !== 'all' ? 'Zkus jiné hledání nebo kategorii.' : 'Správce může přidat nový projekt.';
     document.querySelector('#all-count').textContent = projects.filter(project => !project.parentId).length;
     const count = `${shown.length} ${shown.length === 1 ? 'položka' : shown.length >= 2 && shown.length <= 4 ? 'položky' : 'položek'}`;
     document.querySelector('#bottom-count').textContent = count;
@@ -170,17 +197,17 @@
     const icon = document.createElement('span');
     icon.className = `project-icon ${info.iconClass}`;
     icon.setAttribute('aria-hidden', 'true');
-    const fallbackIcon = project.kind === 'folder' ? '📁' : project.kind === 'python' ? '🐍' : info.icon;
+    const fallbackIcon = project.kind === 'folder' ? 'folder' : project.kind === 'python' ? 'code' : info.icon;
     const favicon = validFaviconUrl(project.iconUrl);
     if (favicon && project.kind !== 'folder' && project.kind !== 'python') {
       const image = document.createElement('img');
       image.src = favicon;
       image.alt = '';
       image.loading = 'lazy';
-      image.addEventListener('error', () => { icon.replaceChildren(document.createTextNode(fallbackIcon)); }, { once: true });
+      image.addEventListener('error', () => { icon.replaceChildren(pixelIcon(fallbackIcon)); }, { once: true });
       icon.append(image);
     } else {
-      icon.textContent = fallbackIcon;
+      icon.append(pixelIcon(fallbackIcon));
     }
     if (project.kind === 'folder') icon.classList.add('folder-icon');
     if (project.kind === 'python') icon.classList.add('python-icon');
@@ -201,7 +228,7 @@
     footer.className = 'card-footer';
     const category = document.createElement('span');
     category.className = 'card-category';
-    category.textContent = project.kind === 'folder' ? 'SLOŽKA · 2 PROJEKTY' : isPythonFileProject(project) ? 'PYTHON SKRIPT' : info.label;
+    category.textContent = project.kind === 'folder' ? 'Složka' : isPythonFileProject(project) ? 'Python skript' : info.label;
     const open = document.createElement('span');
     open.className = 'card-open';
     open.textContent = project.kind === 'folder' ? '›' : isPythonFileProject(project) ? '⌕' : '↗';
@@ -215,7 +242,7 @@
       const edit = document.createElement('button');
       edit.className = 'card-edit admin-only';
       edit.type = 'button';
-      edit.textContent = '✎ UPRAVIT';
+      edit.textContent = 'Upravit';
       edit.setAttribute('aria-label', `Upravit projekt ${project.name}`);
       edit.addEventListener('click', event => {
         event.stopPropagation();
@@ -224,7 +251,7 @@
       const remove = document.createElement('button');
       remove.className = 'card-delete admin-only';
       remove.type = 'button';
-      remove.textContent = '× ODEBRAT';
+      remove.textContent = 'Odebrat';
       remove.setAttribute('aria-label', `Odebrat projekt ${project.name}`);
       remove.addEventListener('click', async event => {
         event.stopPropagation();
@@ -396,7 +423,8 @@
     document.body.dataset.adminMode = isAdmin ? 'true' : 'false';
     document.querySelectorAll('.admin-only').forEach(element => { element.hidden = !isAdmin; });
     const button = document.querySelector('#admin-toggle');
-    button.innerHTML = isAdmin ? '<span aria-hidden="true">▣</span> Admin · Odhlásit' : '<span aria-hidden="true">▣</span> Admin Login';
+    button.replaceChildren(pixelIcon('lock'), document.createTextNode(isAdmin ? 'Odhlásit' : 'Admin Login'));
+    document.querySelector('#access-label').textContent = isAdmin ? 'Správa projektů' : 'Prohlížení projektů';
     button.setAttribute('aria-label', isAdmin ? 'Odhlásit správce' : 'Přihlášení správce');
     button.title = isAdmin ? 'Odhlásit správce' : 'Přihlásit se jako správce';
   }
@@ -432,7 +460,7 @@
   }
 
   function updateSelectIcon() {
-    document.querySelector('#select-emoji').textContent = categoryInfo[categorySelect.value].icon;
+    document.querySelector('#select-emoji').replaceChildren(pixelIcon(categoryInfo[categorySelect.value].icon));
     if (!document.querySelector('#project-icon-url').value) updateFaviconPreview('');
   }
 
@@ -440,8 +468,8 @@
     const requestId = ++faviconRequestId;
     const preview = document.querySelector('#project-favicon-preview');
     const safeUrl = validFaviconUrl(url);
-    const fallback = categoryInfo[categorySelect.value]?.icon || '🌐';
-    preview.replaceChildren(document.createTextNode(fallback));
+    const fallback = categoryInfo[categorySelect.value]?.icon || 'web';
+    preview.replaceChildren(pixelIcon(fallback));
     if (!safeUrl) return;
     const image = document.createElement('img');
     image.alt = '';
@@ -626,7 +654,7 @@
     let particles = [];
     let lastSpawn = 0;
     let frame = 0;
-    const colors = ['#8172e5', '#f2bf61', '#69c7a0', '#ec91b7', '#75b3e6'];
+    const colors = ['#6a9690', '#b8cbbf', '#d5bd80'];
     function resize() {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       width = window.innerWidth;
@@ -639,7 +667,7 @@
     resize();
     window.addEventListener('pointermove', event => {
       const now = performance.now();
-      if (event.pointerType === 'touch' || now - lastSpawn < 24) return;
+      if (event.pointerType === 'touch' || matchMedia('(prefers-reduced-motion: reduce)').matches || now - lastSpawn < 24) return;
       lastSpawn = now;
       for (let i = 0; i < 2; i++) {
         particles.push({ x: event.clientX + (Math.random() - .5) * 9, y: event.clientY + (Math.random() - .5) * 9,
@@ -677,9 +705,9 @@
     const button = document.querySelector('#theme-toggle');
     button.setAttribute('aria-label', dark ? 'Přepnout na světlý režim' : 'Přepnout na tmavý režim');
     button.title = dark ? 'Přepnout na světlý režim' : 'Přepnout na tmavý režim';
-    document.querySelector('#theme-label').textContent = dark ? 'SVĚTLÝ REŽIM' : 'TMAVÝ REŽIM';
-    button.querySelector('.theme-icon').textContent = dark ? '☼' : '◐';
-    document.querySelector('meta[name="theme-color"]').content = dark ? '#141b29' : '#e9edf2';
+    document.querySelector('#theme-label').textContent = dark ? 'Světlý režim' : 'Tmavý režim';
+    button.querySelector('.theme-icon').replaceChildren(pixelIcon(dark ? 'sun' : 'moon'));
+    document.querySelector('meta[name="theme-color"]').content = dark ? '#101e26' : '#c7d5d8';
   }
   let currentTheme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
   applyTheme(currentTheme);
@@ -725,7 +753,7 @@
       weatherPlace.textContent = place;
       weatherTemperature.textContent = `${Math.round(data.current.temperature_2m)}°`;
       weatherHumidity.textContent = `${Math.round(data.current.relative_humidity_2m)}%`;
-      document.querySelector('#weather-symbol').textContent = '☀';
+      document.querySelector('#weather-symbol').replaceChildren(pixelIcon('sun'));
     } catch (error) {
       console.warn('Počasí se nepodařilo načíst.', error);
       weatherPlace.textContent = 'Počasí nedostupné';
@@ -752,11 +780,128 @@
   }
   document.querySelector('#weather-refresh').addEventListener('click', requestLocalWeather);
 
+  // Low-resolution layers are painted once per resize/theme change. Only their
+  // offsets change during parallax; no continuous animation runs while idle.
+  function startPixelLandscape() {
+    const canvas = document.querySelector('#pixel-landscape');
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+    const pane = document.querySelector('.projects-pane');
+    let layers = [];
+    let sky = '';
+    let frame = 0;
+    let lastTime = 0;
+    let x = 0, y = 0, targetX = 0, targetY = 0, scroll = 0;
+    const margin = 20;
+
+    function build() {
+      const scale = Math.max(4, Math.ceil(innerWidth / 640));
+      canvas.width = Math.ceil(innerWidth / scale);
+      canvas.height = Math.ceil(innerHeight / scale);
+      context.imageSmoothingEnabled = false;
+      const w = canvas.width + margin * 2;
+      const h = canvas.height + margin * 2;
+      const dark = document.documentElement.dataset.theme === 'dark';
+      const palette = dark
+        ? ['#101e26', '#2b4049', '#b9c9bc', '#364b53', '#293f46', '#1b3439', '#10292e']
+        : ['#c7d5d8', '#dfe6e3', '#e9d7a7', '#a2b9b9', '#8aa5a3', '#6d8e89', '#4f736d'];
+      sky = palette[0];
+      layers = [];
+      for (let i = 0; i < 4; i++) {
+        const layer = document.createElement('canvas');
+        layer.width = w; layer.height = h;
+        const c = layer.getContext('2d');
+        if (i === 0) {
+          // Stepped clouds and sun/moon, kept in the open sky above the ridges.
+          c.fillStyle = palette[2];
+          const sx = Math.floor(w * .84), sy = Math.floor(h * .19);
+          c.fillRect(sx + 3, sy, 12, 18); c.fillRect(sx, sy + 3, 18, 12);
+          if (dark) { c.fillStyle = sky; c.fillRect(sx + 8, sy - 1, 12, 13); }
+          c.fillStyle = palette[1];
+          for (const [cx, cy, length] of [[.12,.14,36],[.48,.3,24],[.82,.39,42]]) {
+            const px = Math.floor(cx * w), py = Math.floor(cy * h);
+            c.fillRect(px, py + 4, length, 4);
+            c.fillRect(px + 6, py, length - 14, 5);
+          }
+          if (dark) {
+            c.fillStyle = '#7d979e';
+            for (let j = 0; j < 32; j++) c.fillRect((j * 73 + 19) % w, (j * 29 + 7) % Math.floor(h * .48), 1, 1);
+          }
+        } else {
+          c.fillStyle = palette[i + 2];
+          // Deterministic stepped terrain: resize and theme changes never shuffle it.
+          for (let px = 0; px < w; px += 2) {
+            const wave = Math.sin(px / w * 9 + i * 2) * .07 + Math.sin(px / w * 21 + i) * .025;
+            const top = Math.floor(h * (.53 + i * .11 + wave));
+            c.fillRect(px, top, 2, h - top);
+          }
+          if (i >= 2) {
+            c.fillStyle = palette[i + 3];
+            const step = i === 3 ? 28 : 16;
+            for (let px = 8; px < w; px += step) {
+              // Keep the central valley open; trees frame the outer desk edges.
+              if (i === 3 && px > w * .25 && px < w * .78) continue;
+              const base = Math.floor(h * (.78 + i * .025) + Math.sin(px * .1) * 5);
+              const size = i === 3 ? 20 : 10;
+              c.fillRect(px + 4, base - size, 2, size + 8);
+              for (let k = 0; k < 4; k++) c.fillRect(px + 3 - k * 2, base - size + 3 + k * 4, 4 + k * 4, 4);
+            }
+          }
+        }
+        layers.push(layer);
+      }
+      paint();
+    }
+
+    function paint() {
+      context.fillStyle = sky;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      layers.forEach((layer, depth) => {
+        const factor = depth + 1;
+        context.drawImage(layer, Math.round(-margin + x * factor * 2), Math.round(-margin + y * factor + scroll * factor));
+      });
+    }
+
+    function animate(now) {
+      frame = 0;
+      const dt = Math.min((now - (lastTime || now - 16)) / 1000, .05);
+      lastTime = now;
+      const blend = 1 - Math.exp(-10 * dt);
+      x += (targetX - x) * blend; y += (targetY - y) * blend;
+      const wantedScroll = reduced.matches ? 0 : Math.min(pane.scrollTop / 240, 2);
+      scroll += (wantedScroll - scroll) * blend;
+      paint();
+      if (Math.abs(targetX - x) + Math.abs(targetY - y) + Math.abs(wantedScroll - scroll) > .002) schedule();
+    }
+    function schedule() { if (!frame && !document.hidden) frame = requestAnimationFrame(animate); }
+    window.addEventListener('pointermove', event => {
+      if (reduced.matches || event.pointerType === 'touch') return;
+      targetX = event.clientX / innerWidth * 2 - 1;
+      targetY = event.clientY / innerHeight * 2 - 1;
+      schedule();
+    }, { passive: true });
+    document.documentElement.addEventListener('pointerleave', () => { targetX = targetY = 0; schedule(); });
+    pane.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', build, { passive: true });
+    new MutationObserver(build).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    reduced.addEventListener('change', () => {
+      cancelAnimationFrame(frame); frame = 0;
+      x = y = targetX = targetY = scroll = 0; paint();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { cancelAnimationFrame(frame); frame = 0; }
+      else { lastTime = 0; schedule(); }
+    });
+    build();
+  }
+
   applyAdminMode();
   loadSharedProjects();
   updateClock();
   setInterval(updateClock, 30_000);
   render();
+  startPixelLandscape();
   startPixelTrail();
   requestLocalWeather();
 })();
