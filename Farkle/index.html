@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#000000">
   <meta name="description" content="Farkle Club, a 3D dice game against bot opponents.">
   <title>Farkle Club — Dice game</title>
-  <link rel="stylesheet" href="style.css?v=20261108-3">
-  <script type="module" src="game.js?v=20261108-4"></script>
+  <link rel="stylesheet" href="style.css?v=20261108-4">
+  <script type="module" src="game.js?v=20261108-5"></script>
 </head>
 <body>
   <canvas id="ambient-pixels" aria-hidden="true"></canvas>
@@ -20,17 +20,23 @@
 
     <section class="game-layout" aria-label="Farkle game">
       <section class="table-card">
-        <div class="table-head"><div><p class="kicker">Game table</p><h1>Farkle</h1></div><div class="round-chip">Round <b id="round-number">—</b></div></div>
+        <div class="table-head">
+          <div class="table-title"><span class="table-thumbnail" aria-hidden="true">F</span><div><p class="kicker">Game table</p><h1>Farkle</h1></div></div>
+          <div class="table-head-meta">
+            <div class="kept-summary" aria-label="Scored dice">
+              <span class="kept-summary-mark" aria-hidden="true">F</span>
+              <span class="kept-summary-copy"><small>Scored</small><b id="kept-dice-count">0 / 6</b></span>
+              <ol class="kept-dice-tray" id="kept-dice-tray" aria-live="polite"></ol>
+            </div>
+            <div class="round-chip">Round <b id="round-number">—</b></div>
+          </div>
+        </div>
         <div class="table-wrap" id="table-wrap">
           <canvas id="dice-table" aria-label="Isometric 3D dice table. Click dice to select scoring combinations."></canvas>
           <div class="table-overlay-top"><span id="turn-label">Waiting for players</span><span id="dice-count-label">6 dice</span></div>
           <div class="table-overlay-bottom"><span class="felt-label">Farkle Club</span><span id="throw-timer" class="throw-timer" aria-live="polite"></span></div>
           <div class="table-loading" id="table-loading"><span class="loading-die">⚄</span><span>Loading table…</span></div>
         </div>
-        <section class="kept-tray-panel" aria-labelledby="kept-tray-title">
-          <div class="kept-tray-heading"><div><p class="kicker">Scored dice</p><h2 id="kept-tray-title">Kept dice</h2></div><span class="kept-count" id="kept-dice-count">0 / 6</span></div>
-          <ol class="kept-dice-tray" id="kept-dice-tray" aria-live="polite"></ol>
-        </section>
         <div class="table-legend"><span><i class="legend-dot ivory"></i> Roll</span><span><i class="legend-dot guide"></i> Scoring flame</span><span><i class="legend-dot selected"></i> Selected</span><span class="legend-tip">Select scoring dice</span></div>
       </section>
 
