@@ -141,3 +141,20 @@ body{background:#000}
 @media(max-width:790px){.game-layout{grid-template-columns:minmax(0,1fr) 272px;gap:10px}.table-card{padding:14px}.panel,.turn-panel,.history-panel{padding:10px}}
 @media(max-width:640px){.game-layout{display:flex;flex-direction:column;gap:12px}.side-column{gap:8px}.kept-tray-panel{padding:8px}.kept-dice-tray{gap:4px}.kept-slot{min-height:38px}.kept-face{width:28px;height:28px;padding:4px}}
 
+/* Compact kept-score summary uses the same square pixel mark as the game identity. */
+.table-head{align-items:center}
+.table-title{display:flex;align-items:center;gap:10px}
+.table-thumbnail,.kept-summary-mark{display:grid;place-items:center;border:1px solid #b0aea8;background:#b0aea8;color:#000;font:700 15px var(--mono);box-shadow:2px 2px #fff}
+.table-thumbnail{width:32px;height:32px}
+.table-head-meta{display:flex;align-items:center;gap:10px}
+.kept-summary{min-height:38px;display:flex;align-items:center;gap:8px;padding:4px 7px;border:1px solid #b0aea866;background:#0009;box-shadow:2px 2px #b0aea866}
+.kept-summary-mark{width:24px;height:24px;font-size:11px;box-shadow:1px 1px #fff}
+.kept-summary-copy{display:grid;gap:2px;min-width:42px}
+.kept-summary-copy small{color:#b0aea8;font:9px var(--mono);line-height:1}
+.kept-summary-copy b{color:#fff;font:11px var(--mono);white-space:nowrap}
+.kept-dice-tray{display:flex;align-items:center;gap:4px;list-style:none;margin:0;padding:0}
+.kept-slot{display:flex;align-items:center;justify-content:center}
+.kept-face{width:23px;height:23px;gap:1px;padding:3px;border:1px solid #fff;box-shadow:1px 1px #000}
+.kept-face i{max-width:4px;max-height:4px}
+@media(max-width:640px){.table-head{align-items:flex-start;flex-wrap:wrap}.table-head-meta{width:100%;justify-content:space-between}.kept-summary{min-height:34px}.table-thumbnail{width:28px;height:28px}}
+
