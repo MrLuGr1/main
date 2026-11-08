@@ -1,6 +1,6 @@
 # Farkle Club
 
-A local-first 3D Farkle game with a low 15° isometric view, an expanded 114 × 171 cm table, Cannon-es rigid-body throws, Three.js rendering, and a small bot lobby.
+A local-first 3D Farkle game with a 45° isometric perspective, an expanded 114 × 171 cm table, Cannon-es rigid-body throws, Three.js rendering, and a small bot lobby.
 
 ## Run locally
 
