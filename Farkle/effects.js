@@ -46,50 +46,71 @@ export class ParticleEffects {
   }
 }
 
-/** Retro pixel flames fall vertically above selectable dice in Easy mode. */
+/** Ruby-red pixel cone streams above selectable dice in Easy mode. */
 export class ScoringFlames {
   constructor(dieMeshes) {
     this.targets=Array(dieMeshes.length).fill(false);
     this.enabled=false;
-    this.particlesPerDie=18;
-    this.pixelMap=this.createPixelMap();
+    this.particlesPerDie=48;
     this.bounds={minX:0,maxX:0,minZ:0,maxZ:0,maxY:0};
     this.corner=new THREE.Vector3();
+    this.material=new THREE.ShaderMaterial({
+      uniforms:{
+        uRuby:{value:new THREE.Color('#c30000')},
+        uOpacity:{value:.9},
+        uPointSize:{value:.115},
+        uViewportHeight:{value:1},
+        uFovRadians:{value:THREE.MathUtils.degToRad(38)},
+      },
+      vertexShader:`
+        attribute float aFade;
+        uniform float uPointSize;
+        uniform float uViewportHeight;
+        uniform float uFovRadians;
+        varying float vFade;
+        void main(){
+          vec4 viewPosition=modelViewMatrix*vec4(position,1.0);
+          gl_Position=projectionMatrix*viewPosition;
+          gl_PointSize=max(1.0,uPointSize*uViewportHeight/(2.0*tan(uFovRadians*.5)*max(.1,-viewPosition.z)));
+          vFade=aFade;
+        }
+      `,
+      fragmentShader:`
+        uniform vec3 uRuby;
+        uniform float uOpacity;
+        varying float vFade;
+        void main(){
+          vec2 edge=min(gl_PointCoord,vec2(1.0)-gl_PointCoord);
+          float edgeFade=smoothstep(0.0,.24,min(edge.x,edge.y));
+          float alpha=clamp(vFade*edgeFade*uOpacity,0.0,1.0);
+          if(alpha<.006)discard;
+          gl_FragColor=vec4(uRuby,alpha);
+          #include <colorspace_fragment>
+        }
+      `,
+      transparent:true,depthTest:true,depthWrite:false,toneMapped:false,
+    });
     this.groups=dieMeshes.map(mesh=>{
       mesh.geometry.computeBoundingBox();
-      const bounds=mesh.geometry.boundingBox;
-      const size=bounds.getSize(new THREE.Vector3());
       const positions=new Float32Array(this.particlesPerDie*3);
+      const fades=new Float32Array(this.particlesPerDie);
       const geometry=new THREE.BufferGeometry();
       geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
-      const material=new THREE.PointsMaterial({
-        color:'#808080',map:this.pixelMap,size:.22,sizeAttenuation:true,transparent:true,opacity:.5,
-        depthWrite:false,toneMapped:false,blending:THREE.CustomBlending,
-        // Restore the original destination-aware pixel-flame blend.
-        blendEquation:THREE.AddEquation,blendSrc:THREE.OneMinusDstColorFactor,blendDst:THREE.OneFactor,
-      });
-      const points=new THREE.Points(geometry,material);
+      geometry.setAttribute('aFade',new THREE.BufferAttribute(fades,1));
+      const points=new THREE.Points(geometry,this.material);
       points.frustumCulled=false;points.renderOrder=4;points.visible=false;
       // Keep the emitters in world space: a tilted die must not tilt the falling path.
-      points.userData.sourceDie=mesh;
       mesh.parent.add(points);
-      const particles=Array.from({length:this.particlesPerDie},(_,index)=>{
-        return {x:(Math.random()-.5)*size.x*.38,z:(Math.random()-.5)*size.z*.38,phase:Math.random(),speed:.72+Math.random()*.65};
-      });
+      const particles=Array.from({length:this.particlesPerDie},()=>({
+        angle:Math.random()*Math.PI*2,radius:Math.sqrt(Math.random()),phase:Math.random(),speed:.55+Math.random()*.5,
+      }));
       return {points,mesh,particles};
     });
   }
 
-  createPixelMap() {
-    const canvas=document.createElement('canvas');canvas.width=canvas.height=8;
-    const ctx=canvas.getContext('2d');
-    const rows=['...#....','..###...','.#####..','#######.','########','########','..####..','...##...'];
-    const colors=['#ffffff','#ffffff','#b0aea8','#c30000','#c30000','#650000','#c30000','#b0aea8'];
-    rows.forEach((row,y)=>[...row].forEach((pixel,x)=>{if(pixel==='#'){ctx.fillStyle=colors[y];ctx.fillRect(x,y,1,1);}}));
-    const texture=new THREE.CanvasTexture(canvas);
-    texture.colorSpace=THREE.SRGBColorSpace;
-    texture.magFilter=THREE.NearestFilter;texture.minFilter=THREE.NearestFilter;texture.generateMipmaps=false;
-    return texture;
+  resize(viewportHeight,fovDegrees) {
+    this.material.uniforms.uViewportHeight.value=viewportHeight;
+    this.material.uniforms.uFovRadians.value=THREE.MathUtils.degToRad(fovDegrees);
   }
 
   setTargets(targets, enabled) {
@@ -120,14 +141,19 @@ export class ScoringFlames {
       const centerX=(bounds.minX+bounds.maxX)*.5;
       const centerZ=(bounds.minZ+bounds.maxZ)*.5;
       const values=group.points.geometry.attributes.position.array;
+      const fades=group.points.geometry.attributes.aFade.array;
       group.particles.forEach((particle,particleIndex)=>{
         const life=(time*particle.speed+particle.phase)%1;
-        const flicker=Math.sin(life*Math.PI*2+particle.phase*8)*.035;
-        values[particleIndex*3]=centerX+particle.x+flicker;
-        values[particleIndex*3+1]=bounds.maxY+.78-life*.7;
-        values[particleIndex*3+2]=centerZ+particle.z+Math.cos(life*Math.PI*2+particle.phase*8)*.035;
+        const radius=life*particle.radius*.48;
+        values[particleIndex*3]=centerX+Math.cos(particle.angle)*radius;
+        values[particleIndex*3+1]=bounds.maxY+.08+(1-life)*.92;
+        values[particleIndex*3+2]=centerZ+Math.sin(particle.angle)*radius;
+        const tipFade=THREE.MathUtils.smoothstep(life,0,.12)*(1-THREE.MathUtils.smoothstep(life,.88,1));
+        const edgeFade=1-THREE.MathUtils.smoothstep(particle.radius,.72,1);
+        fades[particleIndex]=tipFade*edgeFade;
       });
       group.points.geometry.attributes.position.needsUpdate=true;
+      group.points.geometry.attributes.aFade.needsUpdate=true;
     });
   }
 }
