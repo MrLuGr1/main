@@ -158,4 +158,6 @@ body{background:#000}
 .kept-face i{max-width:4px;max-height:4px}
 @media(max-width:640px){.table-head{align-items:flex-start;flex-wrap:wrap}.table-head-meta{width:100%;justify-content:space-between}.kept-summary{min-height:34px}.table-thumbnail{width:28px;height:28px}}
 .performance-monitor{position:fixed;z-index:5;left:8px;bottom:8px;padding:4px 6px;border:1px solid #b0aea866;background:#000c;color:#b0aea8;font:10px var(--mono);font-variant-numeric:tabular-nums;pointer-events:none}
+@media(min-width:641px){html,body{width:100%;height:100%;overflow:hidden}.app-shell{height:100vh;height:100dvh;min-height:0;overflow:hidden}.game-layout{height:calc(100vh - 64px);height:calc(100dvh - 64px);min-height:0;overflow:hidden}.table-card{min-height:0;overflow:hidden}.table-wrap{min-height:0}.side-column{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#b0aea866 transparent}}
+@media(max-width:640px){html,body{height:auto;min-height:100%;overflow-x:hidden;overflow-y:auto}.app-shell{height:auto;min-height:100vh;overflow:visible}.game-layout{height:auto;min-height:0;overflow:visible}.side-column{min-height:0;overflow:visible}}
 
