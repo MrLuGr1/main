@@ -40,5 +40,13 @@
     "category": "other",
     "favorite": true,
     "iconUrl": "https://www.google.com/s2/favicons?domain=google.com&sz=64"
+  },
+  {
+    "id": "77631581-852b-4137-84db-6f2210d1a40a",
+    "name": "test",
+    "description": "test",
+    "url": "test",
+    "category": "other",
+    "favorite": false
   }
 ]
