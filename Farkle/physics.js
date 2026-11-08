@@ -10,7 +10,7 @@ const BOARD_HALF_X = 5 * BOARD_SCALE;
 const BOARD_HALF_Z = 7.5 * BOARD_SCALE;
 const WALL_THICKNESS = .14;
 const KEEP_CENTER = 7.4 * BOARD_SCALE;
-function keptPosition(index) {
+export function keptPosition(index) {
   // The diagonal row is outside the board in world space and its full
   // projection remains beyond the board silhouette in the isometric view.
   const offset=(index-2.5)*KEEP_SPACING/Math.SQRT2;
