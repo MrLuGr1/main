@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#000000">
   <meta name="description" content="Farkle Club, a 3D dice game against bot opponents.">
   <title>Farkle Club — Dice game</title>
-  <link rel="stylesheet" href="style.css?v=20261108-1">
-  <script type="module" src="game.js?v=20261108-1"></script>
+  <link rel="stylesheet" href="style.css?v=20261108-2">
+  <script type="module" src="game.js?v=20261108-2"></script>
 </head>
 <body>
   <canvas id="ambient-pixels" aria-hidden="true"></canvas>
@@ -31,7 +31,7 @@
           <div class="kept-tray-heading"><div><p class="kicker">Scored dice</p><h2 id="kept-tray-title">Kept dice</h2></div><span class="kept-count" id="kept-dice-count">0 / 6</span></div>
           <ol class="kept-dice-tray" id="kept-dice-tray" aria-live="polite"></ol>
         </section>
-        <div class="table-legend"><span><i class="legend-dot ivory"></i> Roll</span><span><i class="legend-dot guide"></i> Easy guide</span><span><i class="legend-dot selected"></i> First selected</span><span><i class="legend-dot selected-blue"></i> Matching dice</span><span class="legend-tip">Select scoring dice</span></div>
+        <div class="table-legend"><span><i class="legend-dot ivory"></i> Roll</span><span><i class="legend-dot guide"></i> Scoring flame</span><span><i class="legend-dot selected"></i> Selected</span><span class="legend-tip">Select scoring dice</span></div>
       </section>
 
       <aside class="side-column">
@@ -83,7 +83,7 @@
         <label>Bot opponents<select id="bot-count"><option value="1">1 bot</option><option value="2" selected>2 bots</option><option value="3">3 bots</option></select></label>
         <label>Winning score<select id="target-score-select"><option value="1000">1,000</option><option value="3000">3,000</option><option value="5000">5,000</option><option value="10000" selected>10,000</option><option value="custom">Custom</option></select></label>
         <label id="custom-target-wrap" hidden>Custom score · max 100,000<input id="custom-target-score" type="number" min="1" max="100000" step="100" value="15000" inputmode="numeric"></label>
-        <label>Difficulty<select id="difficulty-select"><option value="easy">Easy · guides on</option><option value="hard">Hard · guides off</option></select></label>
+        <label>Difficulty<select id="difficulty-select"><option value="easy">Easy · flame on</option><option value="hard">Hard · flame off</option></select></label>
         <label>Dice skin<select id="skin-select"><option value="basic">01 · Basic</option><option value="aurora">02 · Aurora</option><option value="lava">03 · Lava</option><option value="crt">04 · CRT</option><option value="pearl">05 · Pearl</option><option value="toxic">06 · Toxic</option><option value="grid">07 · Grid</option><option value="ocean">08 · Deep sea</option><option value="candy">09 · Candy</option><option value="void">10 · Void pulse</option></select></label>
         <label>Throw power<select id="throw-power-select"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></label>
       </div>
