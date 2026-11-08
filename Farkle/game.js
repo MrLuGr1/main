@@ -2,7 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.m
 import { DicePhysics, BOARD_SCALE, keptPosition } from './physics.js?v=20261108-4';
 import { findScoringOptions, scoreSelection } from './scoring.js';
 import { chooseBotMove, makePlayers } from './bot.js';
-import { ParticleEffects, ScoringFlames, AmbientPixels } from './effects.js?v=20261108-4';
+import { ParticleEffects, ScoringFlames, AmbientPixels } from './effects.js?v=20261108-5';
 
 const canvas = document.querySelector('#dice-table');
 const tableWrap = document.querySelector('#table-wrap');
@@ -154,8 +154,9 @@ const dice = Array.from({ length:6 },(_,id)=>{
   selectedLayer.scale.setScalar(1.018);selectedLayer.visible=false;selectedLayer.renderOrder=3;scene.add(selectedLayer);
   return {id,face:0,mesh,ring,selectedLayer,kept:false};
 });
+const dieMeshes=dice.map(die=>die.mesh);
 const effects = new ParticleEffects(scene);
-const scoringFlames = new ScoringFlames(dice.map(die=>die.mesh));
+const scoringFlames = new ScoringFlames(dieMeshes);
 const ambient = new AmbientPixels(document.querySelector('#ambient-pixels'));
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
@@ -241,6 +242,7 @@ renderKeptTray();
 
 function showLobby(mode='new',winner=null){
   phase='lobby';matchSerial++;
+  setDieHighlights();
   ui.overlay.hidden=false;
   if(mode==='over'){
     ui.overlayKicker.textContent='Game over';
@@ -321,7 +323,7 @@ function beginTurn(){
   currentHistoryEntry=null;
   phase='waiting';turnPoints=0;keptIds=[];activeIds=[0,1,2,3,4,5];selectedIds.clear();selectedResult={valid:false,points:0};botChoice=null;
   dice.forEach(die=>{die.face=0;die.kept=false;die.mesh.visible=true;die.ring.visible=false;die.ring.material.color.set(PALETTE.white);});
-  renderKeptTray();renderPlayers();updateTurnUI();
+  renderKeptTray();renderPlayers();setDieHighlights();updateTurnUI();
   const player=currentPlayer();
   setMessage(player.isHuman?'Your hand is ready. Every throw takes 2 seconds.':`${player.name} is getting ready to roll…`);
   rollHand();
@@ -424,7 +426,7 @@ function keepSelected(automatic=false){
   renderKeptTray();
   activeIds=activeIds.filter(id=>!selectedIds.has(id));
   selectedIds.clear();selectedResult={valid:false,points:0};
-  setDieHighlights();updateTurnUI();
+  updateTurnUI();
   setMessage(`${player.name} keeps ${formatNumber(points)} points. Turn total: ${formatNumber(turnPoints)}.`, 'good');
 
   if(activeIds.length===0){
@@ -432,7 +434,7 @@ function keepSelected(automatic=false){
     later(700,hotDice);
     return;
   }
-  phase='waiting';updateControls();
+  phase='waiting';setDieHighlights();updateControls();
   if(!player.isHuman){
     const bank=botChoice?.shouldBank;
     later(620,()=>bank?bankTurn(true):rollHand());
@@ -441,7 +443,7 @@ function keepSelected(automatic=false){
 
 function hotDice(){
   if(!players.length||!['selecting','waiting'].includes(phase))return;
-  phase='waiting';
+  phase='waiting';setDieHighlights();
   keptIds=[];activeIds=[0,1,2,3,4,5];
   dice.forEach(die=>{die.kept=false;die.ring.visible=false;});
   renderKeptTray();
@@ -455,6 +457,7 @@ function hotDice(){
 function handleFarkle(){
   const player=currentPlayer();
   phase='farkle';
+  setDieHighlights();
   if(player.isHuman){stats.farkles++;saveStats();refreshStats();}
   turnPoints=0;selectedIds.clear();selectedResult={valid:false,points:0};
   effects.burst(PALETTE.red,56,new THREE.Vector3(0,.55,0));
@@ -474,7 +477,7 @@ function bankTurn(automatic=false){
   renderPlayers();
   const winner=players.find(item=>item.score>=matchTarget);
   if(winner){endMatch(winner);return;}
-  phase='banked';turnPoints=0;
+  phase='banked';turnPoints=0;setDieHighlights();
   later(800,nextTurn);
 }
 
@@ -487,6 +490,7 @@ function nextTurn(){
 
 function endMatch(winner){
   phase='gameover';
+  setDieHighlights();
   if(winner.isHuman)stats.wins++;
   saveStats();refreshStats();
   effects.burst(winner.isHuman?PALETTE.white:PALETTE.red,110,new THREE.Vector3(0,.75,0));
@@ -566,8 +570,7 @@ function frame(timestamp){
     if(faces)handleRollSettled(faces);
     ui.timer.textContent=`${Math.max(0,2-(physics.roll?.elapsed||0)).toFixed(2)} s`;
   }
-  physics.sync(dice.map(die=>die.mesh));
-  setDieHighlights();
+  physics.sync(dieMeshes);
   effects.update(dt);
   scoringFlames.update(dt,performance.now()*.001);
   ambient.update(dt);
@@ -577,7 +580,17 @@ function frame(timestamp){
     for(const material of new Set(dieMaterials))material.emissiveIntensity=intensity;
   }
   renderer.render(scene,camera);
+  perfFrames++;
+  const perfElapsed=timestamp-perfWindowStart;
+  if(perfElapsed>=1000){
+    const fps=Math.round(perfFrames*1000/perfElapsed);
+    perfMonitor.textContent=`${fps} FPS · ${renderer.info.render.calls} calls`;
+    perfFrames=0;perfWindowStart=timestamp;
+  }
 }
+const perfMonitor=document.querySelector('#performance-monitor');
+let perfWindowStart=performance.now();
+let perfFrames=0;
 animationFrame=requestAnimationFrame(frame);
 showLobby('new');
 
