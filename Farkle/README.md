@@ -1,6 +1,6 @@
 # Farkle Club
 
-A local-first 3D Farkle game with an isometric 100 × 150 cm table, Cannon-es rigid-body throws, Three.js rendering, and a small bot lobby.
+A local-first 3D Farkle game with a low 15° isometric view, an expanded 114 × 171 cm table, Cannon-es rigid-body throws, Three.js rendering, and a small bot lobby.
 
 ## Run locally
 
@@ -23,12 +23,12 @@ Three.js and Cannon-es are pinned to versioned jsDelivr URLs. An internet connec
 - A roll animates for two seconds. A roll with no scoring selection is a Farkle and clears the current turn total.
 - Reach the selected target to win. If all six dice score, Hot Dice returns all six to the hand for another roll.
 - Choose 1,000, 3,000, 5,000, 10,000, or a custom target up to 100,000 before the match.
-- Easy mode outlines valid scoring dice; the guide shifts from red to black or white if the active skin needs more contrast. Hard mode leaves scoring dice unmarked.
+- Easy mode marks valid scoring dice with pixel particle flames. Hard mode hides these guides.
 - Pick from ten locally generated cube skins. Several use a slow emissive pulse. Your skin choice is remembered in local storage.
 - Choose Low, Medium, or High throw power in the lobby; it scales the dice launch velocities and spin.
-- The table has invisible collision walls. At the end of a throw, dice settle onto separated positions without changing their size or overlapping dice already kept in the rack.
+- The expanded table has matching invisible physics walls. At the end of a throw, dice settle onto separated positions without changing their size or overlapping dice already kept in the rack.
 - Kept dice move to a separate six-slot rail below the 3D board, so the staging area cannot overlap the felt or board labels. The last three throws remain in the table log, including which rolled values were saved.
-- In selected triples and larger groups, the lead die has a transparent green overlay and the other matching dice use blue. Clicking a blue die promotes it to the green lead; clicking the lead again deselects it.
+- Every selected scoring die uses the same transparent green overlay, including dice selected as part of a matching set.
 - Pip colors automatically switch between black and white for strong contrast on every skin.
 
 ## Modules
@@ -38,7 +38,7 @@ Three.js and Cannon-es are pinned to versioned jsDelivr URLs. An internet connec
 - `physics.js` — Cannon-es world, dice bodies, throws, and two-second settling.
 - `scoring.js` — pure Farkle scoring and scoring-subset enumeration.
 - `bot.js` — bot seats and a simple risk-aware move choice.
-- `effects.js` — GPU bursts for Hot Dice, Farkles, and wins, plus a cursor-reactive background pixel field.
+- `effects.js` — GPU bursts for Hot Dice, Farkles, and wins, scoring-die flame particles, plus a brighter cursor-reactive background pixel field.
 
 The scoring module and game state are intentionally separate from rendering and storage so a future API or WebSocket transport can replace the local match coordinator.
 
