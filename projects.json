@@ -31,5 +31,14 @@
     "url": "Farkle/index.html",
     "category": "web",
     "favorite": false
+  },
+  {
+    "id": "e1435e70-6ca5-4e1d-a7c3-f1bad627fc1f",
+    "name": "google.com",
+    "description": "test",
+    "url": "https://google.com",
+    "category": "other",
+    "favorite": true,
+    "iconUrl": "https://www.google.com/s2/favicons?domain=google.com&sz=64"
   }
 ]
