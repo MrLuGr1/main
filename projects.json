@@ -31,13 +31,5 @@
     "url": "Farkle/index.html",
     "category": "web",
     "favorite": false
-  },
-  {
-    "id": "492bf495-8513-41be-99f3-520ce2fe0770",
-    "name": "test",
-    "description": "test",
-    "url": "google.com",
-    "category": "web",
-    "favorite": false
   }
 ]
