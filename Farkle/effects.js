@@ -49,9 +49,11 @@ export class ParticleEffects {
 /** Ruby-to-white pixel candle flames stream above selectable dice in Easy mode. */
 export class ScoringFlames {
   constructor(dieMeshes) {
+    this.dieMeshes=dieMeshes;
     this.targets=Array(dieMeshes.length).fill(false);
     this.enabled=false;
     this.particlesPerDie=24;
+    this.particleCount=dieMeshes.length*this.particlesPerDie;
     this.bounds={minX:0,maxX:0,minZ:0,maxZ:0,maxY:0};
     this.corner=new THREE.Vector3();
     this.material=new THREE.ShaderMaterial({
@@ -96,24 +98,17 @@ export class ScoringFlames {
       `,
       transparent:true,depthTest:true,depthWrite:false,toneMapped:false,
     });
-    this.groups=dieMeshes.map(mesh=>{
-      mesh.geometry.computeBoundingBox();
-      const positions=new Float32Array(this.particlesPerDie*3);
-      const fades=new Float32Array(this.particlesPerDie);
-      const gradients=new Float32Array(this.particlesPerDie);
-      const geometry=new THREE.BufferGeometry();
-      geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
-      geometry.setAttribute('aFade',new THREE.BufferAttribute(fades,1));
-      geometry.setAttribute('aGradient',new THREE.BufferAttribute(gradients,1));
-      const points=new THREE.Points(geometry,this.material);
-      points.frustumCulled=false;points.renderOrder=4;points.visible=false;
-      // Keep the emitters in world space: a tilted die must not tilt the falling path.
-      mesh.parent.add(points);
-      const particles=Array.from({length:this.particlesPerDie},()=>({
-        angle:Math.random()*Math.PI*2,radius:Math.sqrt(Math.random()),phase:Math.random(),speed:.55+Math.random()*.5,
-      }));
-      return {points,mesh,particles};
-    });
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(this.particleCount*3),3));
+    geometry.setAttribute('aFade',new THREE.BufferAttribute(new Float32Array(this.particleCount),1));
+    geometry.setAttribute('aGradient',new THREE.BufferAttribute(new Float32Array(this.particleCount),1));
+    this.points=new THREE.Points(geometry,this.material);
+    this.points.frustumCulled=false;this.points.renderOrder=4;this.points.visible=false;
+    // Batch every die's particles into one draw call.
+    dieMeshes[0].parent.add(this.points);
+    this.particles=dieMeshes.map(()=>Array.from({length:this.particlesPerDie},()=>({
+      angle:Math.random()*Math.PI*2,radius:Math.sqrt(Math.random()),phase:Math.random(),speed:.55+Math.random()*.5,
+    })));
   }
 
   resize(viewportHeight,fovDegrees) {
@@ -128,13 +123,22 @@ export class ScoringFlames {
   }
 
   update(_delta, time) {
-    this.groups.forEach((group,index)=>{
-      const visible=this.enabled&&this.targets[index];
-      group.points.visible=visible;
-      if(!visible)return;
-      group.mesh.updateWorldMatrix(true,false);
-      const box=group.mesh.geometry.boundingBox;
-      const matrix=group.mesh.matrixWorld;
+    this.points.visible=this.enabled&&this.targets.some(Boolean);
+    if(!this.points.visible)return;
+    const geometry=this.points.geometry;
+    const values=geometry.attributes.position.array;
+    const fades=geometry.attributes.aFade.array;
+    const gradients=geometry.attributes.aGradient.array;
+    for(let dieIndex=0;dieIndex<this.dieMeshes.length;dieIndex++){
+      const mesh=this.dieMeshes[dieIndex];
+      const start=dieIndex*this.particlesPerDie;
+      if(!this.targets[dieIndex]||!mesh.visible){
+        fades.fill(0,start,start+this.particlesPerDie);
+        continue;
+      }
+      mesh.updateWorldMatrix(true,false);
+      const box=mesh.geometry.boundingBox;
+      const matrix=mesh.matrixWorld;
       const bounds=this.bounds;
       bounds.minX=Infinity;bounds.maxX=-Infinity;bounds.minZ=Infinity;bounds.maxZ=-Infinity;bounds.maxY=-Infinity;
       for(let xi=0;xi<2;xi++)for(let yi=0;yi<2;yi++)for(let zi=0;zi<2;zi++){
@@ -148,30 +152,28 @@ export class ScoringFlames {
       }
       const centerX=(bounds.minX+bounds.maxX)*.5;
       const centerZ=(bounds.minZ+bounds.maxZ)*.5;
-      const values=group.points.geometry.attributes.position.array;
-      const fades=group.points.geometry.attributes.aFade.array;
-      const gradients=group.points.geometry.attributes.aGradient.array;
-      group.particles.forEach((particle,particleIndex)=>{
+      const particles=this.particles[dieIndex];
+      for(let particleIndex=0;particleIndex<particles.length;particleIndex++){
+        const particle=particles[particleIndex],index=start+particleIndex;
         const life=(time*particle.speed+particle.phase)%1;
-        // life moves from the flame tip down to its narrow base at the die.
-        const height=1-life;
+        const height=life;
         const roundedBody=Math.pow(Math.sin(Math.PI*height),.78);
         const flameRadius=.035+.27*roundedBody*(1-.42*height);
         const radius=flameRadius*particle.radius;
-        values[particleIndex*3]=centerX+Math.cos(particle.angle)*radius;
-        values[particleIndex*3+1]=bounds.maxY+.08+height*.92;
-        values[particleIndex*3+2]=centerZ+Math.sin(particle.angle)*radius;
+        values[index*3]=centerX+Math.cos(particle.angle)*radius;
+        values[index*3+1]=bounds.maxY+.08+height*.92;
+        values[index*3+2]=centerZ+Math.sin(particle.angle)*radius;
         const tipFade=THREE.MathUtils.smoothstep(height,0,.12)*(1-THREE.MathUtils.smoothstep(height,.9,1));
         const edgeFade=1-THREE.MathUtils.smoothstep(particle.radius,.72,1);
-        fades[particleIndex]=tipFade*edgeFade;
+        fades[index]=tipFade*edgeFade;
         const upperGlow=THREE.MathUtils.smoothstep(height,.12,.92);
         const coreGlow=(1-particle.radius)*.38*(1-Math.min(1,Math.abs(height-.52)*1.7));
-        gradients[particleIndex]=Math.max(upperGlow,coreGlow);
-      });
-      group.points.geometry.attributes.position.needsUpdate=true;
-      group.points.geometry.attributes.aFade.needsUpdate=true;
-      group.points.geometry.attributes.aGradient.needsUpdate=true;
-    });
+        gradients[index]=Math.max(upperGlow,coreGlow);
+      }
+    }
+    geometry.attributes.position.needsUpdate=true;
+    geometry.attributes.aFade.needsUpdate=true;
+    geometry.attributes.aGradient.needsUpdate=true;
   }
 }
 
@@ -193,8 +195,8 @@ export class AmbientPixels {
       this.lastPointerSample=now;
       const elapsed=(now-this.pointer.lastAt)/1000;
       if(elapsed>.001&&elapsed<.12){
-        this.pointer.vx=Math.max(-2200,Math.min(2200,(x-this.pointer.lastX)/elapsed));
-        this.pointer.vy=Math.max(-2200,Math.min(2200,(y-this.pointer.lastY)/elapsed));
+        this.pointer.vx=Math.max(-900,Math.min(900,(x-this.pointer.lastX)/elapsed));
+        this.pointer.vy=Math.max(-900,Math.min(900,(y-this.pointer.lastY)/elapsed));
       }
       this.pointer.lastX=x;this.pointer.lastY=y;this.pointer.lastAt=now;
     },{passive:true});
@@ -213,18 +215,20 @@ export class AmbientPixels {
   update(dt) {
     const ctx=this.context;ctx.clearRect(0,0,this.width,this.height);
     const now=performance.now();
-    const pointerSpeed=Math.min(1,Math.hypot(this.pointer.vx,this.pointer.vy)/850);
+    const pointerSpeed=Math.min(1,Math.hypot(this.pointer.vx,this.pointer.vy)/1100);
     for(const pixel of this.pixels){
-      const dx=pixel.x-this.pointer.x,dy=pixel.y-this.pointer.y,distance=Math.hypot(dx,dy)||1;
-      if(distance<270){
-        const influence=1-distance/270,force=influence*(220+pointerSpeed*1250);
-        pixel.vx+=(dx/distance*force+this.pointer.vx*.32*influence)*dt;
-        pixel.vy+=(dy/distance*force+this.pointer.vy*.32*influence)*dt;
+      const dx=pixel.x-this.pointer.x,dy=pixel.y-this.pointer.y,distanceSquared=dx*dx+dy*dy;
+      if(distanceSquared<270*270){
+        const distance=Math.sqrt(distanceSquared)||1;
+        const influence=1-distance/270,force=influence*(55+pointerSpeed*150);
+        pixel.vx+=(dx/distance*force+this.pointer.vx*.06*influence)*dt;
+        pixel.vy+=(dy/distance*force+this.pointer.vy*.06*influence)*dt;
       }
-      pixel.vx+=(Math.sin(pixel.phase+now*.00045)*10-pixel.vx)*dt*.11;
-      pixel.vy+=(Math.cos(pixel.phase+now*.0004)*10-pixel.vy)*dt*.11;
+      const damping=1-Math.exp(-dt*2.8);
+      pixel.vx+=(Math.sin(pixel.phase+now*.00045)*7-pixel.vx)*damping;
+      pixel.vy+=(Math.cos(pixel.phase+now*.0004)*7-pixel.vy)*damping;
       const speed=Math.hypot(pixel.vx,pixel.vy);
-      if(speed>300){pixel.vx=pixel.vx/speed*300;pixel.vy=pixel.vy/speed*300;}
+      if(speed>140){pixel.vx=pixel.vx/speed*140;pixel.vy=pixel.vy/speed*140;}
       pixel.x+=pixel.vx*dt;pixel.y+=pixel.vy*dt;
       if(pixel.x<-8)pixel.x=this.width+8;if(pixel.x>this.width+8)pixel.x=-8;
       if(pixel.y<-8)pixel.y=this.height+8;if(pixel.y>this.height+8)pixel.y=-8;
@@ -232,7 +236,7 @@ export class AmbientPixels {
       ctx.fillStyle=pixel.color;ctx.fillRect(Math.round(pixel.x),Math.round(pixel.y),pixel.size,pixel.size);
     }
     ctx.globalAlpha=1;
-    const decay=Math.exp(-dt*5.5);this.pointer.vx*=decay;this.pointer.vy*=decay;
+    const decay=Math.exp(-dt*4.2);this.pointer.vx*=decay;this.pointer.vy*=decay;
   }
 }
 
