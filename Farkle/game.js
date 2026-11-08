@@ -1,8 +1,8 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
-import { DicePhysics, BOARD_SCALE, keptPosition } from './physics.js?v=20261108-4';
+import { DicePhysics, BOARD_SCALE, keptPosition } from './physics.js?v=20261108-5';
 import { findScoringOptions, scoreSelection } from './scoring.js';
 import { chooseBotMove, makePlayers } from './bot.js';
-import { ParticleEffects, ScoringFlames, AmbientPixels } from './effects.js?v=20261108-6';
+import { ParticleEffects, ScoringFlames, AmbientPixels } from './effects.js?v=20261108-7';
 
 const canvas = document.querySelector('#dice-table');
 const tableWrap = document.querySelector('#table-wrap');
@@ -549,6 +549,7 @@ function resize(){
   }
   camera.fov=THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2*Math.atan(requiredTan)),24,82);
   camera.updateProjectionMatrix();
+  scoringFlames.resize(rect.height*renderer.getPixelRatio(),camera.fov);
 }
 new ResizeObserver(resize).observe(tableWrap);resize();
 ui.loading.hidden=true;
@@ -562,8 +563,8 @@ function frame(timestamp){
   frameAccumulator+=Math.min(timestamp-lastFrameTime,100);
   lastFrameTime=timestamp;
   if(frameAccumulator<FRAME_INTERVAL)return;
-  const dt=Math.min(frameAccumulator/1000,.05);
-  frameAccumulator%=FRAME_INTERVAL;
+  const dt=frameAccumulator/1000;
+  frameAccumulator=0;
   physics.updateStashes(dt);
   if(phase==='rolling'){
     const faces=physics.step(dt);
