@@ -1,6 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
 import { DicePhysics, BOARD_SCALE, keptPosition } from './physics.js?v=20261108-5';
-import { findScoringOptions, scoreSelection } from './scoring.js';
+import { findScoringOptions, scoreSelection } from './scoring.js?v=20261109-1';
 import { chooseBotMove, makePlayers } from './bot.js';
 import { ParticleEffects, ScoringFlames, AmbientPixels } from './effects.js?v=20261108-9';
 
