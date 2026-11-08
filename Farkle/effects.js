@@ -48,31 +48,35 @@ export class ParticleEffects {
 
 /** Pixel sparks hover above every scoring die in Easy mode. */
 export class ScoringFlames {
-  constructor(scene, dieCount = 6) {
-    this.targets=Array(dieCount).fill(false);
+  constructor(dieMeshes) {
+    this.targets=Array(dieMeshes.length).fill(false);
     this.enabled=false;
     this.particlesPerDie=18;
     const flameMap=this.createPixelMap();
-    this.groups=Array.from({length:dieCount},()=>{
+    this.groups=dieMeshes.map(mesh=>{
+      mesh.geometry.computeBoundingBox();
+      const bounds=mesh.geometry.boundingBox;
+      const size=bounds.getSize(new THREE.Vector3());
+      const center=bounds.getCenter(new THREE.Vector3());
       const positions=new Float32Array(this.particlesPerDie*3);
       const geometry=new THREE.BufferGeometry();
       geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
       const material=new THREE.PointsMaterial({
-        color:'#808080',map:flameMap,size:8,sizeAttenuation:true,transparent:true,opacity:.5,
+        color:'#808080',map:flameMap,size:.22,sizeAttenuation:true,transparent:true,opacity:.5,
         depthWrite:false,toneMapped:false,blending:THREE.CustomBlending,
         // Destination-aware screen blend brightens dark pixels and shifts with the felt beneath it.
         blendEquation:THREE.AddEquation,blendSrc:THREE.OneMinusDstColorFactor,blendDst:THREE.OneFactor,
       });
       const points=new THREE.Points(geometry,material);
-      points.frustumCulled=false;points.renderOrder=4;points.visible=false;scene.add(points);
+      points.position.set(center.x,bounds.max.y+.05,center.z);
+      points.frustumCulled=false;points.renderOrder=4;points.visible=false;mesh.add(points);
       return {
         points,
         particles:Array.from({length:this.particlesPerDie},()=>({
-          x:(Math.random()-.5)*.72,z:(Math.random()-.5)*.72,phase:Math.random(),speed:.72+Math.random()*.65,
+          x:(Math.random()-.5)*size.x*.38,z:(Math.random()-.5)*size.z*.38,phase:Math.random(),speed:.72+Math.random()*.65,
         })),
       };
     });
-    this.localPoint=new THREE.Vector3();
   }
 
   createPixelMap() {
@@ -92,21 +96,18 @@ export class ScoringFlames {
     targets.forEach((target,index)=>{this.targets[index]=Boolean(target);});
   }
 
-  update(meshes, _delta, time) {
+  update(_delta, time) {
     this.groups.forEach((group,index)=>{
-      const mesh=meshes[index];
-      const visible=this.enabled&&this.targets[index]&&Boolean(mesh?.visible);
+      const visible=this.enabled&&this.targets[index];
       group.points.visible=visible;
       if(!visible)return;
-      mesh.updateWorldMatrix(true,false);
       const values=group.points.geometry.attributes.position.array;
       group.particles.forEach((particle,particleIndex)=>{
         const life=(time*particle.speed+particle.phase)%1;
-        this.localPoint.set(particle.x,.47,particle.z).applyMatrix4(mesh.matrixWorld);
         const flicker=Math.sin(life*Math.PI*2+particle.phase*8)*.035;
-        values[particleIndex*3]=this.localPoint.x+flicker;
-        values[particleIndex*3+1]=this.localPoint.y+.08+life*.58;
-        values[particleIndex*3+2]=this.localPoint.z+Math.cos(life*Math.PI*2+particle.phase*8)*.035;
+        values[particleIndex*3]=particle.x+flicker;
+        values[particleIndex*3+1]=.08+life*.58;
+        values[particleIndex*3+2]=particle.z+Math.cos(life*Math.PI*2+particle.phase*8)*.035;
       });
       group.points.geometry.attributes.position.needsUpdate=true;
     });
