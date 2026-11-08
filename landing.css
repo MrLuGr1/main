@@ -184,6 +184,11 @@ body[data-admin-mode='true'] .project-description { margin-bottom: 16px; }
 .favicon-status { flex-basis: 100%; font-size: 12px; color: var(--muted); line-height: 1.4; }
 .admin-login-status { margin: 12px 0 0; color: var(--danger); font-size: 14px; }
 .admin-login-status:empty { display: none; }
+.sync-status { margin-left: 2px; color: var(--muted); font: 11px var(--mono); letter-spacing: .1px; }
+.sync-status[data-state="ok"] { color: #4e7961; }
+.sync-status[data-state="error"] { color: var(--danger); }
+.confirm-dialog { width: min(480px,calc(100vw - 32px)); }
+.confirm-dialog .dialog-intro { margin: 0; color: var(--secondary); font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
 .terminal-dialog { width: min(800px,calc(100vw - 32px)); }
 .terminal-body { padding: 20px; }
 .terminal-project-path { font: 12px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
@@ -210,6 +215,8 @@ body[data-admin-mode='true'] .project-description { margin-bottom: 16px; }
   .window-titlebar { padding: 0 12px; font-size: 11px; }.window-controls { display: none; }.toolbar { flex-basis: auto; min-height: 64px; flex-wrap: wrap; gap: 8px; }.toolbar-actions { gap: 8px; }.search-box { width: 100%; }.toolbar-actions:has(.add-button[hidden]) { display: none; }
   .pathbar { gap: 8px; font-size: 11px; }.path-computer, .path-folder { display: none; }.projects-pane { padding: 20px 16px; }.pane-heading-row { flex-direction: column; align-items: flex-start; gap: 20px; }
   .weather-widget { width: 100%; }.pane-heading-tools { width: 100%; }.weather-place { max-width: none; }.project-grid { grid-template-columns: 1fr; gap: 12px; }.project-card { min-height: 176px; }.card-top { margin-bottom: 8px; }
+  .statusbar { gap: 7px; padding: 0 10px; }.sync-status { font-size: 9px; }
   .list-view .project-card { padding: 16px 16px 48px 64px; }.list-view .card-top { left: 12px; }.list-view .card-footer { top: auto; bottom: 12px; left: 64px; }.dialog-body { padding: 20px; }
 }
 @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }#pixel-trail { display: none; } }
+

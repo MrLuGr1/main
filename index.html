@@ -9,8 +9,8 @@
   <script>try{if(localStorage.getItem('pixel-desk-theme-v1')==='dark')document.documentElement.dataset.theme='dark'}catch{}</script>
   <title>Pixel Desk — rozcestník projektů</title>
   <!-- Zvyš verzi ?v= při každém vydání frontendových souborů; běžné obnovení tak stáhne novou kopii. -->
-  <link rel="stylesheet" href="landing.css?v=20261108-2">
-  <script src="script.js?v=20261108-2" defer></script>
+  <link rel="stylesheet" href="landing.css?v=20261108-3">
+  <script src="script.js?v=20261108-3" defer></script>
 </head>
 <body>
   <canvas id="pixel-landscape" aria-hidden="true"></canvas>
@@ -61,7 +61,7 @@
           <span id="bottom-count" class="sr-only">0 položek</span>
         </section>
       </div>
-      <footer class="statusbar"><span class="status-square"></span><span id="status-count">0 položek</span><span class="status-spacer"></span><span class="status-grid" aria-hidden="true">▦</span></footer>
+      <footer class="statusbar"><span class="status-square"></span><span id="status-count">0 položek</span><span class="sync-status" id="sync-status" role="status" aria-live="polite">Cloudflare sync: čeká…</span><span class="status-spacer"></span><span class="status-grid" aria-hidden="true">▦</span></footer>
     </section>
     
   </main>
@@ -80,6 +80,11 @@
       </div>
       <div class="dialog-footer"><button class="cancel-button" id="cancel-dialog" type="button">Zrušit</button><button class="save-button" type="submit"><span>＋</span> <span id="save-project-label">Uložit projekt</span></button></div>
     </form>
+  </dialog>
+  <dialog class="project-dialog confirm-dialog" id="admin-confirm-dialog" aria-labelledby="confirm-title">
+    <div class="dialog-titlebar"><span class="dialog-folder" aria-hidden="true">▣</span><span id="confirm-title">Potvrdit změnu</span><button class="dialog-x" id="close-confirm" type="button" aria-label="Zavřít">×</button></div>
+    <div class="dialog-body"><p class="dialog-intro" id="confirm-message">Opravdu chceš změnu uložit do sdíleného seznamu?</p></div>
+    <div class="dialog-footer"><button class="cancel-button" id="cancel-confirm" type="button">Zrušit</button><button class="save-button" id="accept-confirm" type="button">Potvrdit a uložit</button></div>
   </dialog>
   <dialog class="project-dialog admin-dialog" id="admin-dialog" aria-labelledby="admin-title">
     <form id="admin-login-form">
@@ -101,4 +106,5 @@
 
 </body>
 </html>
+
 

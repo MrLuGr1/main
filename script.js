@@ -3,6 +3,9 @@
 
   const STORAGE_KEY = 'pixel-desk-projects-v1';
   const DELETED_IDS_KEY = 'pixel-desk-deleted-ids-v1';
+  const ADMIN_SESSION_KEY = 'pixel-desk-admin-session-v1';
+  const ADMIN_SESSION_TTL_MS = 30 * 60 * 1000;
+  const PROJECT_SYNC_INTERVAL_MS = 15 * 1000;
   // This URL is public configuration, not a secret. Passwords and session tokens never go in source control.
   const API_BASE = (document.querySelector('meta[name="pixel-desk-api"]')?.content || '').trim().replace(/\/$/, '');
   const REMOVED_BUILTIN_IDS = new Set(['dos-tools-folder', 'dos-penetration-test', 'dos-request-spammer']);
@@ -43,6 +46,60 @@
   let faviconRequestId = 0;
   // Invalidates project-list requests that began before a successful mutation.
   let projectStateRevision = 0;
+  let adminSessionExpiresAt = 0;
+  let adminSessionTimer = 0;
+  let formHasUnsavedChanges = false;
+  let mutationInFlight = false;
+  let confirmationResolver = null;
+  let lastCloudflareSync = null;
+  let syncError = false;
+  let projectSyncChannel = null;
+  try { projectSyncChannel = new BroadcastChannel('pixel-desk-projects-v1'); } catch { /* Polling still synchronizes private windows and unsupported browsers. */ }
+
+  function updateSyncStatus() {
+    const status = document.querySelector('#sync-status');
+    if (!status) return;
+    if (syncError) {
+      status.textContent = 'Cloudflare sync: chyba';
+      status.dataset.state = 'error';
+      return;
+    }
+    status.dataset.state = lastCloudflareSync ? 'ok' : 'waiting';
+    status.textContent = lastCloudflareSync
+      ? `Cloudflare sync: ${new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(lastCloudflareSync)}`
+      : 'Cloudflare sync: čeká…';
+  }
+
+  function markCloudflareSync() {
+    lastCloudflareSync = new Date();
+    syncError = false;
+    updateSyncStatus();
+  }
+
+  function setSyncError() {
+    syncError = true;
+    updateSyncStatus();
+  }
+
+  function confirmAdminChange(title, message, confirmLabel = 'Potvrdit a uložit') {
+    if (!isAdmin) return Promise.resolve(false);
+    const confirmDialog = document.querySelector('#admin-confirm-dialog');
+    document.querySelector('#confirm-title').textContent = title;
+    document.querySelector('#confirm-message').textContent = message;
+    document.querySelector('#accept-confirm').textContent = confirmLabel;
+    return new Promise(resolve => {
+      confirmationResolver = resolve;
+      confirmDialog.showModal();
+    });
+  }
+
+  function resolveConfirmation(accepted) {
+    const resolve = confirmationResolver;
+    confirmationResolver = null;
+    if (resolve) resolve(accepted);
+    const confirmDialog = document.querySelector('#admin-confirm-dialog');
+    if (confirmDialog.open) confirmDialog.close();
+  }
 
   // One local SVG set: no icon fonts, emoji rendering differences or external requests.
   function pixelIcon(kind) {
@@ -133,6 +190,11 @@
 
   async function apiRequest(path, options = {}) {
     if (!API_BASE) throw new Error('Zabezpečené API ještě není nakonfigurováno.');
+    const isLogin = path === '/api/login';
+    const isPublicRead = path === '/api/projects' && (!options.method || options.method === 'GET');
+    if (!isLogin && !isPublicRead && (!isAdmin || !adminToken || !ensureAdminSession())) {
+      throw new Error('Přihlášení správce vypršelo. Přihlas se znovu.');
+    }
     const headers = new Headers(options.headers || {});
     if (options.body) headers.set('Content-Type', 'application/json');
     if (adminToken) headers.set('Authorization', `Bearer ${adminToken}`);
@@ -145,27 +207,35 @@
     if (!response.ok) {
       const error = new Error(payload.error || `API vrátilo chybu ${response.status}.`);
       error.status = response.status;
+      if (response.status === 401 && !isLogin) expireAdminSession();
       throw error;
     }
     return payload;
   }
 
-  async function loadSharedProjects() {
+  async function loadSharedProjects({ quiet = false } = {}) {
     if (!API_BASE) return;
+    if (mutationInFlight) return;
     const requestRevision = projectStateRevision;
     try {
       const result = await apiRequest('/api/projects');
       // A slower initial GET must never undo a newer add/edit/delete response.
-      if (requestRevision !== projectStateRevision) return;
+      if (requestRevision !== projectStateRevision || mutationInFlight) return;
       const deletedIds = readDeletedProjectIds();
       const custom = Array.isArray(result.projects) ? result.projects.filter(project => !deletedIds.has(project?.id) && isValidProject(project)) : [];
       projects = [...starterProjects, ...custom];
       saveProjects();
+      markCloudflareSync();
       render();
     } catch (error) {
       console.warn('Sdílené projekty se nepodařilo načíst.', error);
+      if (quiet) {
+        setSyncError();
+        return;
+      }
       projects = withQrMakerFallback(projects);
       render();
+      setSyncError();
       showToast('Sdílený seznam není dostupný; zobrazuji místní kopii.');
     }
   }
@@ -274,7 +344,11 @@
         event.stopPropagation();
         if (!isAdmin) return;
         if (remove.disabled) return;
+        const accepted = await confirmAdminChange('Odebrat projekt', `Opravdu chceš trvale odebrat „${project.name}“ ze sdíleného seznamu?`, 'Odebrat projekt');
+        if (!accepted || !isAdmin) return;
         remove.disabled = true;
+        mutationInFlight = true;
+        projectStateRevision += 1;
         try {
           const result = await apiRequest(`/api/projects/${encodeURIComponent(project.id)}`, { method: 'DELETE' });
           rememberDeletedProject(project.id);
@@ -283,6 +357,8 @@
             ? [...starterProjects, ...result.projects.filter(isValidProject)]
             : projects.filter(item => item.id !== project.id);
           saveProjects();
+          markCloudflareSync();
+          projectSyncChannel?.postMessage({ type: 'changed' });
           render();
           showToast('Projekt byl odebrán ze sdíleného seznamu.');
         } catch (error) {
@@ -295,10 +371,13 @@
             saveProjects();
             render();
             showToast('Projekt už ve sdíleném seznamu není; zobrazení bylo synchronizováno.');
-            return;
+          } else {
+            showToast(`Projekt se nepodařilo odebrat: ${error.message}`);
+            remove.disabled = false;
           }
-          showToast(`Projekt se nepodařilo odebrat: ${error.message}`);
-          remove.disabled = false;
+        } finally {
+          mutationInFlight = false;
+          loadSharedProjects({ quiet: true });
         }
       });
       actions.append(edit, remove);
@@ -448,16 +527,50 @@
     button.title = isAdmin ? 'Odhlásit správce' : 'Přihlásit se jako správce';
   }
 
-  function signOutAdmin() {
+  function clearAdminSession() {
+    clearTimeout(adminSessionTimer);
+    adminSessionTimer = 0;
+    adminSessionExpiresAt = 0;
+    try { sessionStorage.removeItem(ADMIN_SESSION_KEY); } catch { /* Storage can be disabled; token is still cleared in memory. */ }
+  }
+
+  function expireAdminSession() {
+    if (!isAdmin) return;
+    if (document.querySelector('#admin-confirm-dialog').open) resolveConfirmation(false);
+    if (dialog.open) dialog.close();
+    signOutAdmin(true);
+  }
+
+  function ensureAdminSession() {
+    if (!isAdmin || !adminSessionExpiresAt || Date.now() >= adminSessionExpiresAt) {
+      if (isAdmin) expireAdminSession();
+      return false;
+    }
+    return true;
+  }
+
+  function startAdminSession() {
+    const startedAt = Date.now();
+    adminSessionExpiresAt = startedAt + ADMIN_SESSION_TTL_MS;
+    try {
+      sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify({ startedAt, expiresAt: adminSessionExpiresAt }));
+    } catch { /* Session remains protected by its in-memory expiry and the Worker token expiry. */ }
+    clearTimeout(adminSessionTimer);
+    adminSessionTimer = setTimeout(() => expireAdminSession(), ADMIN_SESSION_TTL_MS);
+  }
+
+  function signOutAdmin(expired = false) {
     adminToken = '';
     isAdmin = false;
+    clearAdminSession();
     applyAdminMode();
     render();
-    showToast('Odhlášení správce proběhlo.');
+    showToast(expired ? 'Relace správce vypršela. Přihlas se znovu.' : 'Odhlášení správce proběhlo.');
   }
 
   function showDialog(project = null) {
     if (!isAdmin) return;
+    formHasUnsavedChanges = false;
     document.querySelector('#load-favicon').disabled = false;
     form.reset();
     updateSelectIcon();
@@ -536,8 +649,8 @@
     image.src = faviconUrl;
   }
 
-  document.querySelector('#open-add').addEventListener('click', showDialog);
-  document.querySelector('#empty-add').addEventListener('click', showDialog);
+  document.querySelector('#open-add').addEventListener('click', () => showDialog());
+  document.querySelector('#empty-add').addEventListener('click', () => showDialog());
   document.querySelector('#load-favicon').addEventListener('click', fetchProjectFavicon);
   document.querySelector('#project-url').addEventListener('input', () => {
     faviconRequestId += 1;
@@ -550,6 +663,16 @@
   const adminLoginForm = document.querySelector('#admin-login-form');
   const adminPassword = document.querySelector('#admin-password');
   const adminLoginStatus = document.querySelector('#admin-login-status');
+  document.querySelector('#accept-confirm').addEventListener('click', () => resolveConfirmation(true));
+  document.querySelector('#cancel-confirm').addEventListener('click', () => resolveConfirmation(false));
+  document.querySelector('#close-confirm').addEventListener('click', () => resolveConfirmation(false));
+  document.querySelector('#admin-confirm-dialog').addEventListener('cancel', event => {
+    event.preventDefault();
+    resolveConfirmation(false);
+  });
+  form.addEventListener('input', () => { if (isAdmin && dialog.open) formHasUnsavedChanges = true; });
+  form.addEventListener('change', () => { if (isAdmin && dialog.open) formHasUnsavedChanges = true; });
+  dialog.addEventListener('close', () => { formHasUnsavedChanges = false; });
   document.querySelector('#admin-toggle').addEventListener('click', () => {
     if (isAdmin) {
       signOutAdmin();
@@ -570,6 +693,7 @@
       if (typeof result.token !== 'string' || !result.token) throw new Error('Server nevrátil platnou relaci.');
       adminToken = result.token;
       isAdmin = true;
+      startAdminSession();
       adminPassword.value = '';
       adminDialog.close();
       applyAdminMode();
@@ -621,7 +745,7 @@
 
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    if (!isAdmin) return;
+    if (!isAdmin || mutationInFlight) return;
     if (!form.reportValidity()) return;
     const data = new FormData(form);
     const project = {
@@ -635,12 +759,22 @@
       parentId: (editingProjectId ? projects.find(item => item.id === editingProjectId)?.parentId : activeFolder) || undefined,
     };
     if (!project.name || !project.url) return;
+    const wasEditing = Boolean(editingProjectId);
+    const accepted = await confirmAdminChange(
+      wasEditing ? 'Uložit úpravy projektu' : 'Přidat projekt',
+      wasEditing ? `Uložit změny projektu „${project.name}“ do sdíleného seznamu?` : `Přidat „${project.name}“ do sdíleného seznamu?`,
+    );
+    if (!accepted || !isAdmin) return;
+    mutationInFlight = true;
+    projectStateRevision += 1;
     try {
       const method = editingProjectId ? 'PUT' : 'POST';
       const endpoint = editingProjectId ? `/api/projects/${encodeURIComponent(editingProjectId)}` : '/api/projects';
       await apiRequest(endpoint, { method, body: JSON.stringify(project) });
     } catch (error) {
+      mutationInFlight = false;
       showToast(`Projekt se nepodařilo uložit: ${error.message}`);
+      loadSharedProjects({ quiet: true });
       return;
     }
     projectStateRevision += 1;
@@ -651,14 +785,19 @@
       projects.unshift(project);
     }
     saveProjects();
+    markCloudflareSync();
+    projectSyncChannel?.postMessage({ type: 'changed' });
+    mutationInFlight = false;
     activeFilter = 'all';
     query = '';
     search.value = '';
     document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.filter === 'all'));
     render();
+    formHasUnsavedChanges = false;
     dialog.close();
     showToast(editingProjectId ? 'Změny projektu byly uloženy.' : 'Projekt přidán do sdíleného rozcestníku.');
     editingProjectId = '';
+    loadSharedProjects({ quiet: true });
   });
 
   // Small, square canvas particles keep the trail light and crisp at any screen size.
@@ -935,6 +1074,20 @@
 
   applyAdminMode();
   loadSharedProjects();
+  setInterval(() => { if (!document.hidden) loadSharedProjects({ quiet: true }); }, PROJECT_SYNC_INTERVAL_MS);
+  projectSyncChannel?.addEventListener('message', event => {
+    if (event.data?.type === 'changed') loadSharedProjects({ quiet: true });
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) loadSharedProjects({ quiet: true });
+  });
+  window.addEventListener('focus', () => loadSharedProjects({ quiet: true }));
+  window.addEventListener('beforeunload', event => {
+    if (!isAdmin || (!formHasUnsavedChanges && !mutationInFlight)) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
+  updateSyncStatus();
   updateClock();
   setInterval(updateClock, 30_000);
   render();
@@ -942,3 +1095,4 @@
   startPixelTrail();
   requestLocalWeather();
 })();
+
