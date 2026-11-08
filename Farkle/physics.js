@@ -9,12 +9,10 @@ export const BOARD_SCALE = 1.14;
 const BOARD_HALF_X = 5 * BOARD_SCALE;
 const BOARD_HALF_Z = 7.5 * BOARD_SCALE;
 const WALL_THICKNESS = .14;
-const KEEP_CENTER = 7.4 * BOARD_SCALE;
+const KEEP_EDGE_X = BOARD_HALF_X + WALL_THICKNESS + HALF + .15;
 export function keptPosition(index) {
-  // The diagonal row is outside the board in world space and its full
-  // projection remains beyond the board silhouette in the isometric view.
-  const offset=(index-2.5)*KEEP_SPACING/Math.SQRT2;
-  return {x:KEEP_CENTER+offset,z:KEEP_CENTER-offset};
+  // Keep the six-die rail just beyond the right long edge, inside the camera frame.
+  return {x:KEEP_EDGE_X,z:(index-2.5)*KEEP_SPACING};
 }
 const THROW_POWER = { low: .62, medium: 1, high: 1.42 };
 const REST_GAP = 1.32;
