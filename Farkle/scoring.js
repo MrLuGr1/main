@@ -19,6 +19,30 @@ export function scoreSelection(faces) {
     if ([1, 2, 3, 4, 5].every(face => counts[face] === 1)) return { valid: true, points: 750, label: 'Straight 1–5', used: faces.length };
     if ([2, 3, 4, 5, 6].every(face => counts[face] === 1)) return { valid: true, points: 1000, label: 'Straight 2–6', used: faces.length };
   }
+  // A five-die straight can score together with a remaining single 1 or 5.
+  if (faces.length === 6) {
+    const straights = [
+      { faces: [1, 2, 3, 4, 5], points: 750, label: 'Straight 1–5' },
+      { faces: [2, 3, 4, 5, 6], points: 1000, label: 'Straight 2–6' },
+    ];
+    for (const straight of straights) {
+      if (!straight.faces.every(face => counts[face] > 0)) continue;
+      let extraFace = 0;
+      for (let face = 1; face <= 6; face++) {
+        const remaining = counts[face] - Number(straight.faces.includes(face));
+        if (remaining > 0) extraFace = face;
+      }
+      if (extraFace === 1 || extraFace === 5) {
+        const extraPoints = extraFace === 1 ? 100 : 50;
+        return {
+          valid: true,
+          points: straight.points + extraPoints,
+          label: `${straight.label} + ${extraFace}`,
+          used: faces.length,
+        };
+      }
+    }
+  }
 
   let points = 0;
   let used = 0;
