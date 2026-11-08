@@ -115,32 +115,20 @@ function makeFaceTexture(value, skinId) {
   });
 }
 const faceForMaterialOrder = [3, 4, 1, 6, 2, 5]; // BoxGeometry groups: +x, -x, +y, -y, +z, -z.
-function makeSkinMaterial(skinId) {
+function makeSkinMaterials(skinId) {
   const skin=SKINS[skinId]||SKINS.basic;
-  const faces=Array.from({length:6},(_,i)=>makeFaceTexture(i+1,skinId));
-  const atlas=document.createElement('canvas');atlas.width=1536;atlas.height=1024;
-  const context=atlas.getContext('2d');
-  faces.forEach((texture,index)=>context.drawImage(texture.image,(index%3)*512,Math.floor(index/3)*512));
-  faces.forEach(texture=>texture.dispose());
-  const map=new THREE.CanvasTexture(atlas);
-  map.colorSpace=THREE.SRGBColorSpace;map.magFilter=THREE.NearestFilter;map.minFilter=THREE.NearestFilter;map.generateMipmaps=false;
-  return new THREE.MeshStandardMaterial({map,roughness:.58,metalness:.02,emissive:new THREE.Color(skin.pulse?skin.trim:'#000000'),emissiveIntensity:skin.pulse ? .12 : 0});
+  const faces=Array.from({length:6},(_,i)=>new THREE.MeshStandardMaterial({
+    map:makeFaceTexture(i+1,skinId),roughness:.58,metalness:.02,
+    emissive:new THREE.Color(skin.pulse?skin.trim:'#000000'),emissiveIntensity:skin.pulse ? .12 : 0,
+  }));
+  return faceForMaterialOrder.map(face=>faces[face-1]);
 }
 function makeDieGeometry(){
-  const geometry=new THREE.BoxGeometry(.9,.9,.9),uv=geometry.attributes.uv,index=geometry.index;
-  geometry.groups.forEach((group,groupIndex)=>{
-    const face=faceForMaterialOrder[groupIndex],column=(face-1)%3,row=Math.floor((face-1)/3);
-    const left=column/3+2/1536,bottom=1-(row+1)/2+2/1024;
-    const width=1/3-4/1536,height=.5-4/1024;
-    for(let i=group.start;i<group.start+group.count;i++){
-      const vertex=index.getX(i),u=uv.getX(vertex),v=uv.getY(vertex);
-      uv.setXY(vertex,left+u*width,bottom+v*height);
-    }
-  });
-  uv.needsUpdate=true;geometry.computeBoundingBox();
+  const geometry=new THREE.BoxGeometry(.9,.9,.9);
+  geometry.computeBoundingBox();
   return geometry;
 }
-let dieMaterial=makeSkinMaterial(activeSkin);
+let dieMaterials=makeSkinMaterials(activeSkin);
 const dieGeometry=makeDieGeometry();
 
 function relativeLuminance(hex){
@@ -170,7 +158,7 @@ const ringGeometry=new THREE.RingGeometry(.56,.7,4);
 const ringMaterial=new THREE.MeshBasicMaterial({color:PALETTE.gray,transparent:true,opacity:.9,side:THREE.DoubleSide,depthWrite:false});
 const selectionMaterial=new THREE.MeshBasicMaterial({color:SELECTION_GREEN,transparent:true,opacity:.38,side:THREE.DoubleSide,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1});
 const dice = Array.from({ length:6 },(_,id)=>{
-  const mesh=new THREE.Mesh(dieGeometry,dieMaterial);
+  const mesh=new THREE.Mesh(dieGeometry,dieMaterials);
   mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData.dieId=id;mesh.visible=false;scene.add(mesh);
   const ring=new THREE.Mesh(ringGeometry,ringMaterial);
   ring.rotation.x=-Math.PI/2;ring.position.y=.028;ring.visible=false;scene.add(ring);
@@ -315,10 +303,10 @@ ui.throwPower.addEventListener('change',()=>{try{localStorage.setItem('farkle-cl
 
 function applySkin(skinId){
   if(!SKINS[skinId])return;
-  const next=makeSkinMaterial(skinId);
-  dieMaterial.map?.dispose();dieMaterial.dispose();
-  dieMaterial=next;activeSkin=skinId;
-  dice.forEach(die=>{die.mesh.material=dieMaterial;});
+  const next=makeSkinMaterials(skinId);
+  for(const material of new Set(dieMaterials)){material.map?.dispose();material.dispose();}
+  dieMaterials=next;activeSkin=skinId;
+  dice.forEach(die=>{die.mesh.material=dieMaterials;});
   try{localStorage.setItem('farkle-club-die-skin',skinId);}catch{/* Keep the in-memory choice for this visit. */}
 }
 
@@ -577,12 +565,17 @@ function resize(){
 new ResizeObserver(resize).observe(tableWrap);resize();
 ui.loading.hidden=true;
 
+const FRAME_INTERVAL=1000/60;
 let lastFrameTime=0;
+let frameAccumulator=0;
 function frame(timestamp){
   animationFrame=requestAnimationFrame(frame);
-  const dt=lastFrameTime?Math.min((timestamp-lastFrameTime)/1000,.1):0;
+  if(!lastFrameTime){lastFrameTime=timestamp;return;}
+  frameAccumulator+=Math.min(timestamp-lastFrameTime,100);
   lastFrameTime=timestamp;
-  if(!dt)return;
+  if(frameAccumulator<FRAME_INTERVAL)return;
+  const dt=frameAccumulator/1000;
+  frameAccumulator%=FRAME_INTERVAL;
   physics.updateStashes(dt);
   if(phase==='rolling'){
     const faces=physics.step(dt);
@@ -596,7 +589,7 @@ function frame(timestamp){
   const pulse=performance.now()*.001;
   if(SKINS[activeSkin].pulse){
     const intensity=.12+.13*(.5+.5*Math.sin(pulse*.45));
-    dieMaterial.emissiveIntensity=intensity;
+    for(const material of dieMaterials)material.emissiveIntensity=intensity;
   }
   renderer.render(scene,camera);
   perfFrames++;
