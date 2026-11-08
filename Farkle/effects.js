@@ -46,45 +46,51 @@ export class ParticleEffects {
   }
 }
 
-/** Pixel sparks hover above every scoring die in Easy mode. */
+/** Square pixel columns fall vertically above selectable dice in Easy mode. */
 export class ScoringFlames {
   constructor(dieMeshes) {
     this.targets=Array(dieMeshes.length).fill(false);
     this.enabled=false;
-    this.particlesPerDie=18;
-    const flameMap=this.createPixelMap();
+    this.particlesPerDie=16;
+    this.pixelMap=this.createPixelMap();
+    this.palette=['#ffffff','#b0aea8','#c30000','#650000'];
+    this.bounds={minX:0,maxX:0,minZ:0,maxZ:0,maxY:0};
+    this.corner=new THREE.Vector3();
     this.groups=dieMeshes.map(mesh=>{
       mesh.geometry.computeBoundingBox();
       const bounds=mesh.geometry.boundingBox;
       const size=bounds.getSize(new THREE.Vector3());
-      const center=bounds.getCenter(new THREE.Vector3());
       const positions=new Float32Array(this.particlesPerDie*3);
+      const colors=new Float32Array(this.particlesPerDie*3);
       const geometry=new THREE.BufferGeometry();
       geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+      geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
       const material=new THREE.PointsMaterial({
-        color:'#808080',map:flameMap,size:.22,sizeAttenuation:true,transparent:true,opacity:.5,
+        color:'#ffffff',vertexColors:true,map:this.pixelMap,size:.17,sizeAttenuation:true,transparent:true,opacity:.5,
         depthWrite:false,toneMapped:false,blending:THREE.CustomBlending,
-        // Destination-aware screen blend brightens dark pixels and shifts with the felt beneath it.
-        blendEquation:THREE.AddEquation,blendSrc:THREE.OneMinusDstColorFactor,blendDst:THREE.OneFactor,
+        // Difference-style destination blending makes each square invert its backdrop.
+        blendEquation:THREE.AddEquation,blendSrc:THREE.OneMinusDstColorFactor,blendDst:THREE.OneMinusSrcColorFactor,
+        blendEquationAlpha:THREE.AddEquation,blendSrcAlpha:THREE.OneFactor,blendDstAlpha:THREE.OneMinusSrcAlphaFactor,
       });
       const points=new THREE.Points(geometry,material);
-      points.position.set(center.x,bounds.max.y+.05,center.z);
-      points.frustumCulled=false;points.renderOrder=4;points.visible=false;mesh.add(points);
-      return {
-        points,
-        particles:Array.from({length:this.particlesPerDie},()=>({
-          x:(Math.random()-.5)*size.x*.38,z:(Math.random()-.5)*size.z*.38,phase:Math.random(),speed:.72+Math.random()*.65,
-        })),
-      };
+      points.frustumCulled=false;points.renderOrder=4;points.visible=false;
+      // Keep the emitters in world space: a tilted die must not tilt the falling path.
+      points.userData.sourceDie=mesh;
+      mesh.parent.add(points);
+      const particles=Array.from({length:this.particlesPerDie},(_,index)=>{
+        const color=new THREE.Color(this.palette[index%this.palette.length]);
+        colors[index*3]=color.r;colors[index*3+1]=color.g;colors[index*3+2]=color.b;
+        return {x:(Math.random()-.5)*size.x*.5,z:(Math.random()-.5)*size.z*.5,phase:Math.random(),speed:.62+Math.random()*.55};
+      });
+      geometry.attributes.color.needsUpdate=true;
+      return {points,mesh,particles};
     });
   }
 
   createPixelMap() {
-    const canvas=document.createElement('canvas');canvas.width=canvas.height=8;
+    const canvas=document.createElement('canvas');canvas.width=canvas.height=4;
     const ctx=canvas.getContext('2d');
-    const rows=['...#....','..###...','.#####..','#######.','########','########','..####..','...##...'];
-    const colors=['#ffffff','#ffffff','#b0aea8','#c30000','#c30000','#650000','#c30000','#b0aea8'];
-    rows.forEach((row,y)=>[...row].forEach((pixel,x)=>{if(pixel==='#'){ctx.fillStyle=colors[y];ctx.fillRect(x,y,1,1);}}));
+    ctx.fillStyle='#ffffff';ctx.fillRect(0,0,4,4);
     const texture=new THREE.CanvasTexture(canvas);
     texture.colorSpace=THREE.SRGBColorSpace;
     texture.magFilter=THREE.NearestFilter;texture.minFilter=THREE.NearestFilter;texture.generateMipmaps=false;
@@ -93,6 +99,7 @@ export class ScoringFlames {
 
   setTargets(targets, enabled) {
     this.enabled=enabled;
+    this.targets.fill(false);
     targets.forEach((target,index)=>{this.targets[index]=Boolean(target);});
   }
 
@@ -101,13 +108,29 @@ export class ScoringFlames {
       const visible=this.enabled&&this.targets[index];
       group.points.visible=visible;
       if(!visible)return;
+      group.mesh.updateWorldMatrix(true,false);
+      const box=group.mesh.geometry.boundingBox;
+      const matrix=group.mesh.matrixWorld;
+      const bounds=this.bounds;
+      bounds.minX=Infinity;bounds.maxX=-Infinity;bounds.minZ=Infinity;bounds.maxZ=-Infinity;bounds.maxY=-Infinity;
+      for(let xi=0;xi<2;xi++)for(let yi=0;yi<2;yi++)for(let zi=0;zi<2;zi++){
+        const x=xi?box.max.x:box.min.x;
+        const y=yi?box.max.y:box.min.y;
+        const z=zi?box.max.z:box.min.z;
+        this.corner.set(x,y,z).applyMatrix4(matrix);
+        bounds.minX=Math.min(bounds.minX,this.corner.x);bounds.maxX=Math.max(bounds.maxX,this.corner.x);
+        bounds.minZ=Math.min(bounds.minZ,this.corner.z);bounds.maxZ=Math.max(bounds.maxZ,this.corner.z);
+        bounds.maxY=Math.max(bounds.maxY,this.corner.y);
+      }
+      const centerX=(bounds.minX+bounds.maxX)*.5;
+      const centerZ=(bounds.minZ+bounds.maxZ)*.5;
       const values=group.points.geometry.attributes.position.array;
       group.particles.forEach((particle,particleIndex)=>{
         const life=(time*particle.speed+particle.phase)%1;
-        const flicker=Math.sin(life*Math.PI*2+particle.phase*8)*.035;
-        values[particleIndex*3]=particle.x+flicker;
-        values[particleIndex*3+1]=.08+life*.58;
-        values[particleIndex*3+2]=particle.z+Math.cos(life*Math.PI*2+particle.phase*8)*.035;
+        // X/Z remain fixed for each pixel; only world Y changes from above the die downward.
+        values[particleIndex*3]=centerX+particle.x;
+        values[particleIndex*3+1]=bounds.maxY+.78-life*.7;
+        values[particleIndex*3+2]=centerZ+particle.z;
       });
       group.points.geometry.attributes.position.needsUpdate=true;
     });
@@ -123,13 +146,19 @@ export class AmbientPixels {
     this.palette=['#c30000','#b0aea8','#ffffff','#ffffff'];
     this.resize=()=>this.setSize();
     addEventListener('resize',this.resize,{passive:true});
+    this.lastPointerSample=0;
     addEventListener('pointermove',event=>{
-      const now=performance.now(),x=event.clientX,y=event.clientY,elapsed=(now-this.pointer.lastAt)/1000;
+      const now=performance.now(),x=event.clientX,y=event.clientY;
+      this.pointer.x=x;this.pointer.y=y;
+      // The background only renders at 60 Hz, so sample pointer velocity at the same rate.
+      if(now-this.lastPointerSample<1000/60)return;
+      this.lastPointerSample=now;
+      const elapsed=(now-this.pointer.lastAt)/1000;
       if(elapsed>.001&&elapsed<.12){
         this.pointer.vx=Math.max(-2200,Math.min(2200,(x-this.pointer.lastX)/elapsed));
         this.pointer.vy=Math.max(-2200,Math.min(2200,(y-this.pointer.lastY)/elapsed));
       }
-      this.pointer.x=x;this.pointer.y=y;this.pointer.lastX=x;this.pointer.lastY=y;this.pointer.lastAt=now;
+      this.pointer.lastX=x;this.pointer.lastY=y;this.pointer.lastAt=now;
     },{passive:true});
     this.setSize();
   }
