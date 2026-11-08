@@ -9,9 +9,10 @@ const tableWrap = document.querySelector('#table-wrap');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#000000');
 const camera = new THREE.PerspectiveCamera(38, 1, .1, 120);
-// Fixed isometric perspective: 45° above the tabletop, 45° around its diagonal.
+// Landscape isometric perspective: keep the 45° seated-player elevation and
+// look along the board's short edge so its long axis runs across the screen.
 const ISO_ELEVATION = THREE.MathUtils.degToRad(45);
-const ISO_AZIMUTH = THREE.MathUtils.degToRad(45);
+const ISO_AZIMUTH = THREE.MathUtils.degToRad(90);
 const cameraRadius = 27;
 camera.position.set(
   cameraRadius * Math.cos(ISO_ELEVATION) * Math.sin(ISO_AZIMUTH),
@@ -158,7 +159,6 @@ const scoringFlames = new ScoringFlames(dice.map(die=>die.mesh));
 const ambient = new AmbientPixels(document.querySelector('#ambient-pixels'));
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
-const clock = new THREE.Clock();
 
 const STORAGE_KEY='farkle-club-stats-v1';
 function loadStats(){try{const value=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');return {games:Number(value.games)||0,wins:Number(value.wins)||0,farkles:Number(value.farkles)||0,bestBank:Number(value.bestBank)||0};}catch{return {games:0,wins:0,farkles:0,bestBank:0};}}
@@ -224,19 +224,13 @@ const PIP_POSITIONS={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,
 function renderKeptTray(){
   const values=keptIds.map(id=>dice[id].face);
   ui.keptCount.textContent=`${values.length} / 6`;
-  ui.keptTray.replaceChildren(...Array.from({length:6},(_,index)=>{
-    const slot=document.createElement('li');slot.className=`kept-slot${values[index]?' is-kept':''}`;
-    slot.setAttribute('aria-label',values[index]?`Kept die showing ${values[index]}`:`Empty kept-die slot ${index+1}`);
-    if(values[index]){
-      const face=document.createElement('span');face.className='kept-face';face.setAttribute('aria-hidden','true');
-      const pips=new Set(PIP_POSITIONS[values[index]]);
-      for(let pip=0;pip<9;pip++){const cell=document.createElement('i');if(pips.has(pip))cell.className='is-pip';face.append(cell);}
-      const label=document.createElement('span');label.className='kept-slot-label';label.textContent=String(index+1).padStart(2,'0');
-      slot.append(face,label);
-    }else{
-      const empty=document.createElement('span');empty.className='kept-slot-label';empty.textContent=String(index+1).padStart(2,'0');slot.append(empty);
-    }
-    return slot;
+  ui.keptTray.replaceChildren(...values.map((value,index)=>{
+    const slot=document.createElement('li');slot.className='kept-slot';
+    slot.setAttribute('aria-label',`Scored die ${index+1}, showing ${value}`);
+    const face=document.createElement('span');face.className='kept-face';face.setAttribute('aria-hidden','true');
+    const pips=new Set(PIP_POSITIONS[value]);
+    for(let pip=0;pip<9;pip++){const cell=document.createElement('i');if(pips.has(pip))cell.className='is-pip';face.append(cell);}
+    slot.append(face);return slot;
   }));
 }
 
@@ -555,9 +549,17 @@ function resize(){
 new ResizeObserver(resize).observe(tableWrap);resize();
 ui.loading.hidden=true;
 
-function frame(){
+const FRAME_INTERVAL=1000/60;
+let lastFrameTime=0;
+let frameAccumulator=0;
+function frame(timestamp){
   animationFrame=requestAnimationFrame(frame);
-  const dt=Math.min(clock.getDelta(),.05);
+  if(!lastFrameTime){lastFrameTime=timestamp;return;}
+  frameAccumulator+=Math.min(timestamp-lastFrameTime,100);
+  lastFrameTime=timestamp;
+  if(frameAccumulator<FRAME_INTERVAL)return;
+  const dt=Math.min(frameAccumulator/1000,.05);
+  frameAccumulator%=FRAME_INTERVAL;
   physics.updateStashes(dt);
   if(phase==='rolling'){
     const faces=physics.step(dt);
@@ -576,6 +578,6 @@ function frame(){
   }
   renderer.render(scene,camera);
 }
-frame();
+animationFrame=requestAnimationFrame(frame);
 showLobby('new');
 
