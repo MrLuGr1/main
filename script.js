@@ -10,6 +10,7 @@
   const API_BASE = (document.querySelector('meta[name="pixel-desk-api"]')?.content || '').trim().replace(/\/$/, '');
   const REMOVED_BUILTIN_IDS = new Set(['dos-tools-folder', 'dos-penetration-test', 'dos-request-spammer']);
   const REMOVED_DEMO_IDS = new Set(['demo-1', 'demo-2', 'demo-3', 'demo-4', 'demo-5', 'demo-6']);
+  const REMOVED_TEST_IDS = new Set(['4c6e3b56-087f-435f-bd27-f17ab0ce0a38', '483dce28-6db4-4f01-8979-c5aea3fd8ce3']);
   const REMOVED_DEMO_NAMES = new Set(['portfolio', 'portfolio 2025', 'pixel garden', 'weather app', 'moodboard', 'study tracker', 'study stracker', 'tiny tools']);
   const categoryInfo = {
     web: { label: 'Web & aplikace', icon: 'web', iconClass: 'web' },
@@ -48,6 +49,7 @@
   let projectStateRevision = 0;
   let adminSessionExpiresAt = 0;
   let adminSessionTimer = 0;
+  let restoringAdminSession = false;
   let formHasUnsavedChanges = false;
   let mutationInFlight = false;
   let confirmationResolver = null;
@@ -149,7 +151,7 @@
         const projects = JSON.parse(saved);
         if (Array.isArray(projects)) {
           const deletedIds = readDeletedProjectIds();
-          const retained = projects.filter(project => !deletedIds.has(project?.id) && !REMOVED_BUILTIN_IDS.has(project?.id) && !isRemovedDemoProject(project));
+          const retained = projects.filter(project => !deletedIds.has(project?.id) && !REMOVED_BUILTIN_IDS.has(project?.id) && !REMOVED_TEST_IDS.has(project?.id) && !isRemovedDemoProject(project));
           if (retained.length !== projects.length) {
             try { localStorage.setItem(STORAGE_KEY, JSON.stringify(retained)); } catch { /* The visible list is still cleaned for this session. */ }
           }
@@ -165,7 +167,7 @@
 
   function isValidProject(project) {
     return project && typeof project.id === 'string' && typeof project.name === 'string' &&
-      typeof project.url === 'string' && categoryInfo[project.category] && !isRemovedDemoProject(project);
+      typeof project.url === 'string' && categoryInfo[project.category] && !REMOVED_TEST_IDS.has(project.id) && !isRemovedDemoProject(project);
   }
 
   function validFaviconUrl(value) {
@@ -549,14 +551,79 @@
     return true;
   }
 
-  function startAdminSession() {
-    const startedAt = Date.now();
-    adminSessionExpiresAt = startedAt + ADMIN_SESSION_TTL_MS;
-    try {
-      sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify({ startedAt, expiresAt: adminSessionExpiresAt }));
-    } catch { /* Session remains protected by its in-memory expiry and the Worker token expiry. */ }
+  function scheduleAdminSessionExpiry() {
     clearTimeout(adminSessionTimer);
-    adminSessionTimer = setTimeout(() => expireAdminSession(), ADMIN_SESSION_TTL_MS);
+    const remaining = Math.max(0, adminSessionExpiresAt - Date.now());
+    adminSessionTimer = setTimeout(() => {
+      if (isAdmin) expireAdminSession();
+      else {
+        clearAdminSession();
+        adminToken = '';
+        restoringAdminSession = false;
+      }
+    }, remaining);
+  }
+
+  function startAdminSession(token, lifetimeSeconds = 30 * 60) {
+    const startedAt = Date.now();
+    adminToken = token;
+    isAdmin = true;
+    const serverTtl = Number.isFinite(Number(lifetimeSeconds)) ? Number(lifetimeSeconds) * 1000 : ADMIN_SESSION_TTL_MS;
+    adminSessionExpiresAt = startedAt + Math.min(ADMIN_SESSION_TTL_MS, serverTtl);
+    try {
+      sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify({ startedAt, expiresAt: adminSessionExpiresAt, token }));
+    } catch { /* Session remains protected by its in-memory expiry and the Worker token expiry. */ }
+    scheduleAdminSessionExpiry();
+  }
+
+  async function restoreAdminSession() {
+    let saved;
+    try { saved = JSON.parse(sessionStorage.getItem(ADMIN_SESSION_KEY) || 'null'); }
+    catch { saved = null; }
+    const now = Date.now();
+    const validLocalRecord = saved && typeof saved.token === 'string' && saved.token.length > 20 &&
+      Number.isFinite(saved.startedAt) && Number.isFinite(saved.expiresAt) &&
+      saved.expiresAt > now && saved.expiresAt > saved.startedAt &&
+      saved.expiresAt - saved.startedAt <= ADMIN_SESSION_TTL_MS;
+    if (!validLocalRecord || !API_BASE) {
+      if (saved) clearAdminSession();
+      return;
+    }
+
+    restoringAdminSession = true;
+    adminToken = saved.token;
+    adminSessionExpiresAt = saved.expiresAt;
+    scheduleAdminSessionExpiry();
+    try {
+      const response = await fetch(`${API_BASE}/api/session`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+        cache: 'no-store',
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.valid !== true || Date.now() >= adminSessionExpiresAt) {
+        clearAdminSession();
+        adminToken = '';
+        isAdmin = false;
+        applyAdminMode();
+        render();
+        return;
+      }
+      isAdmin = true;
+      applyAdminMode();
+      render();
+      markCloudflareSync();
+      showToast('Správcovská relace byla obnovena.');
+    } catch (error) {
+      // Keep a locally unexpired signed token for this tab; the Worker will still
+      // validate every write and reject it if the session is no longer valid.
+      isAdmin = true;
+      applyAdminMode();
+      render();
+      console.warn('Relaci správce se nepodařilo ověřit online.', error);
+      showToast('Relace obnovena; API není dostupné pro ověření změn.');
+    } finally {
+      restoringAdminSession = false;
+    }
   }
 
   function signOutAdmin(expired = false) {
@@ -674,6 +741,7 @@
   form.addEventListener('change', () => { if (isAdmin && dialog.open) formHasUnsavedChanges = true; });
   dialog.addEventListener('close', () => { formHasUnsavedChanges = false; });
   document.querySelector('#admin-toggle').addEventListener('click', () => {
+    if (restoringAdminSession) return;
     if (isAdmin) {
       signOutAdmin();
       return;
@@ -691,9 +759,7 @@
     try {
       const result = await apiRequest('/api/login', { method: 'POST', body: JSON.stringify({ password: adminPassword.value }) });
       if (typeof result.token !== 'string' || !result.token) throw new Error('Server nevrátil platnou relaci.');
-      adminToken = result.token;
-      isAdmin = true;
-      startAdminSession();
+      startAdminSession(result.token, result.expiresIn);
       adminPassword.value = '';
       adminDialog.close();
       applyAdminMode();
@@ -767,10 +833,11 @@
     if (!accepted || !isAdmin) return;
     mutationInFlight = true;
     projectStateRevision += 1;
+    let savedResult;
     try {
       const method = editingProjectId ? 'PUT' : 'POST';
       const endpoint = editingProjectId ? `/api/projects/${encodeURIComponent(editingProjectId)}` : '/api/projects';
-      await apiRequest(endpoint, { method, body: JSON.stringify(project) });
+      savedResult = await apiRequest(endpoint, { method, body: JSON.stringify(project) });
     } catch (error) {
       mutationInFlight = false;
       showToast(`Projekt se nepodařilo uložit: ${error.message}`);
@@ -778,7 +845,10 @@
       return;
     }
     projectStateRevision += 1;
-    if (editingProjectId) {
+    if (Array.isArray(savedResult.projects)) {
+      const deletedIds = readDeletedProjectIds();
+      projects = [...starterProjects, ...savedResult.projects.filter(item => !deletedIds.has(item?.id) && isValidProject(item))];
+    } else if (editingProjectId) {
       const index = projects.findIndex(item => item.id === editingProjectId);
       if (index >= 0) projects[index] = project;
     } else {
@@ -1073,6 +1143,7 @@
   }
 
   applyAdminMode();
+  restoreAdminSession();
   loadSharedProjects();
   setInterval(() => { if (!document.hidden) loadSharedProjects({ quiet: true }); }, PROJECT_SYNC_INTERVAL_MS);
   projectSyncChannel?.addEventListener('message', event => {

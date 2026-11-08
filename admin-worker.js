@@ -134,8 +134,30 @@ async function writeProjects(env, projects, sha) {
     ...(sha ? { sha } : {}),
   };
   const response = await githubRequest(repoConfig(env), env, { method: 'PUT', body: JSON.stringify(body) });
-  if (response.status === 409 || response.status === 422) throw new Error('Soubor změnil někdo další. Obnov stránku a zkus akci znovu.');
-  if (!response.ok) throw new Error(`Zápis do GitHubu selhal (${response.status}).`);
+  if (response.status === 409 || response.status === 422) {
+    const error = new Error('Seznam projektů se změnil souběžně s tímto zápisem. Zkouším načíst aktuální verzi.');
+    error.code = 'PROJECTS_CONFLICT';
+    throw error;
+  }
+  if (!response.ok) {
+    const error = new Error(`Zápis do GitHubu selhal (${response.status}).`);
+    error.status = response.status;
+    throw error;
+  }
+}
+
+async function mutateProjects(env, transform) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const state = await readProjects(env, true);
+    const projects = transform(state.projects);
+    try {
+      await writeProjects(env, projects, state.sha);
+      return projects;
+    } catch (error) {
+      if (error.code !== 'PROJECTS_CONFLICT' || attempt === 2) throw error;
+    }
+  }
+  throw new Error('Projekt se nepodařilo uložit. Zkus akci znovu.');
 }
 
 function cleanProject(input) {
@@ -198,6 +220,10 @@ export default {
         if (!safeEqual(digest, env.ADMIN_PASSWORD_SHA256.toLowerCase())) return responseJson({ error: 'Heslo není správné.' }, 401, cors);
         return responseJson({ token: await makeSession(env), expiresIn: SESSION_TTL_SECONDS }, 200, cors);
       }
+      if (url.pathname === '/api/session' && request.method === 'GET') {
+        if (!await isAuthenticated(request, env)) return responseJson({ error: 'Přihlášení vypršelo. Přihlas se znovu.' }, 401, cors);
+        return responseJson({ valid: true }, 200, cors);
+      }
       if (url.pathname === '/api/logout' && request.method === 'POST') {
         return responseJson({ ok: true }, 200, cors);
       }
@@ -206,17 +232,26 @@ export default {
       if (url.pathname === '/api/projects' && request.method === 'POST') {
         const project = cleanProject(await request.json());
         if (!project) return responseJson({ error: 'Projekt obsahuje neplatné údaje.' }, 400, cors);
-        const state = await readProjects(env, true);
-        if (state.projects.some(item => item.id === project.id)) return responseJson({ error: 'Projekt s tímto ID už existuje.' }, 409, cors);
-        await writeProjects(env, [...state.projects, project], state.sha);
-        return responseJson({ ok: true, project }, 201, cors);
+        const projects = await mutateProjects(env, current => {
+          if (current.some(item => item.id === project.id)) {
+            const error = new Error('Projekt s tímto ID už existuje.');
+            error.status = 409;
+            throw error;
+          }
+          return [...current, project];
+        });
+        return responseJson({ ok: true, project, projects }, 201, cors);
       }
       const deleteMatch = url.pathname.match(/^\/api\/projects\/([\w-]{1,100})$/);
       if (deleteMatch && request.method === 'DELETE') {
-        const state = await readProjects(env, true);
-        const projects = state.projects.filter(project => project.id !== deleteMatch[1]);
-        if (projects.length === state.projects.length) return responseJson({ error: 'Projekt nebyl nalezen.' }, 404, cors);
-        await writeProjects(env, projects, state.sha);
+        const projects = await mutateProjects(env, current => {
+          if (!current.some(project => project.id === deleteMatch[1])) {
+            const error = new Error('Projekt nebyl nalezen.');
+            error.status = 404;
+            throw error;
+          }
+          return current.filter(project => project.id !== deleteMatch[1]);
+        });
         // Return the committed list so the client can reconcile immediately,
         // without waiting for a separate possibly stale GET request.
         return responseJson({ ok: true, projects }, 200, cors);
@@ -224,17 +259,23 @@ export default {
       if (deleteMatch && request.method === 'PUT') {
         const project = cleanProject(await request.json());
         if (!project || project.id !== deleteMatch[1]) return responseJson({ error: 'Projekt obsahuje neplatné údaje.' }, 400, cors);
-        const state = await readProjects(env, true);
-        const index = state.projects.findIndex(item => item.id === deleteMatch[1]);
-        if (index < 0) return responseJson({ error: 'Projekt nebyl nalezen.' }, 404, cors);
-        const projects = [...state.projects];
-        projects[index] = project;
-        await writeProjects(env, projects, state.sha);
-        return responseJson({ ok: true, project }, 200, cors);
+        const projects = await mutateProjects(env, current => {
+          const index = current.findIndex(item => item.id === deleteMatch[1]);
+          if (index < 0) {
+            const error = new Error('Projekt nebyl nalezen.');
+            error.status = 404;
+            throw error;
+          }
+          const next = [...current];
+          next[index] = project;
+          return next;
+        });
+        return responseJson({ ok: true, project, projects }, 200, cors);
       }
       return responseJson({ error: 'Neznámý API endpoint.' }, 404, cors);
     } catch (error) {
-      return responseJson({ error: error.message || 'Interní chyba serveru.' }, 500, cors);
+      return responseJson({ error: error.message || 'Interní chyba serveru.' }, error.status || 500, cors);
     }
   },
 };
+
