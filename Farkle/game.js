@@ -2,7 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.m
 import { DicePhysics, BOARD_SCALE, keptPosition } from './physics.js?v=20261108-5';
 import { findScoringOptions, scoreSelection } from './scoring.js';
 import { chooseBotMove, makePlayers } from './bot.js';
-import { ParticleEffects, ScoringFlames, AmbientPixels } from './effects.js?v=20261108-7';
+import { ParticleEffects, ScoringFlames, AmbientPixels } from './effects.js?v=20261108-8';
 
 const canvas = document.querySelector('#dice-table');
 const tableWrap = document.querySelector('#table-wrap');
