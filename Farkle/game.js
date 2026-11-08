@@ -1,18 +1,18 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
-import { DicePhysics, BOARD_SCALE } from './physics.js';
+import { DicePhysics, BOARD_SCALE, keptPosition } from './physics.js?v=20261108-3';
 import { findScoringOptions, scoreSelection } from './scoring.js';
 import { chooseBotMove, makePlayers } from './bot.js';
-import { ParticleEffects, ScoringFlames, AmbientPixels } from './effects.js?v=20261108-2';
+import { ParticleEffects, ScoringFlames, AmbientPixels } from './effects.js?v=20261108-3';
 
 const canvas = document.querySelector('#dice-table');
 const tableWrap = document.querySelector('#table-wrap');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#000000');
-const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, .1, 80);
-// Fixed low isometric view: 15° above the table, 45° around its diagonal.
-const ISO_ELEVATION = THREE.MathUtils.degToRad(15);
+const camera = new THREE.PerspectiveCamera(38, 1, .1, 120);
+// Fixed isometric perspective: 45° above the tabletop, 45° around its diagonal.
+const ISO_ELEVATION = THREE.MathUtils.degToRad(45);
 const ISO_AZIMUTH = THREE.MathUtils.degToRad(45);
-const cameraRadius = 28;
+const cameraRadius = 27;
 camera.position.set(
   cameraRadius * Math.cos(ISO_ELEVATION) * Math.sin(ISO_AZIMUTH),
   cameraRadius * Math.sin(ISO_ELEVATION),
@@ -154,7 +154,7 @@ const dice = Array.from({ length:6 },(_,id)=>{
   return {id,face:0,mesh,ring,selectedLayer,kept:false};
 });
 const effects = new ParticleEffects(scene);
-const scoringFlames = new ScoringFlames(scene, dice.length);
+const scoringFlames = new ScoringFlames(dice.map(die=>die.mesh));
 const ambient = new AmbientPixels(document.querySelector('#ambient-pixels'));
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
@@ -529,10 +529,28 @@ function resize(){
   if(rect.width<1||rect.height<1)return;
   renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.7));renderer.setSize(rect.width,rect.height,false);
   const aspect=rect.width/rect.height;
-  // Fit the enlarged tabletop tightly while keeping its entire perimeter visible.
-  const halfHeight=Math.max(4.6,10.2/aspect);
-  const halfWidth=halfHeight*aspect;
-  camera.left=-halfWidth;camera.right=halfWidth;camera.top=halfHeight;camera.bottom=-halfHeight;camera.updateProjectionMatrix();
+  camera.aspect=aspect;
+  camera.updateMatrixWorld(true);
+  const framePoints=[];
+  for(const x of [-BOARD_WIDTH/2,BOARD_WIDTH/2])for(const z of [-BOARD_LENGTH/2,BOARD_LENGTH/2]){
+    for(const y of [-.72,.06,4.2])framePoints.push(new THREE.Vector3(x,y,z).applyMatrix4(camera.matrixWorldInverse));
+  }
+  for(let index=0;index<6;index++){
+    const position=keptPosition(index);
+    for(const x of [position.x-.45,position.x+.45])for(const z of [position.z-.45,position.z+.45]){
+      for(const y of [.012,.912])framePoints.push(new THREE.Vector3(x,y,z).applyMatrix4(camera.matrixWorldInverse));
+    }
+  }
+  // Derive perspective FOV from the projected board bounds, including the peak of a high throw.
+  const frameFill=.9;
+  let requiredTan=.1;
+  for(const point of framePoints){
+    const depth=-point.z;
+    if(depth<=camera.near)continue;
+    requiredTan=Math.max(requiredTan,Math.abs(point.y)/(depth*frameFill),Math.abs(point.x)/(depth*aspect*frameFill));
+  }
+  camera.fov=THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2*Math.atan(requiredTan)),24,82);
+  camera.updateProjectionMatrix();
 }
 new ResizeObserver(resize).observe(tableWrap);resize();
 ui.loading.hidden=true;
@@ -549,7 +567,7 @@ function frame(){
   physics.sync(dice.map(die=>die.mesh));
   setDieHighlights();
   effects.update(dt);
-  scoringFlames.update(dice.map(die=>die.mesh),dt,performance.now()*.001);
+  scoringFlames.update(dt,performance.now()*.001);
   ambient.update(dt);
   const pulse=performance.now()*.001;
   if(SKINS[activeSkin].pulse){
