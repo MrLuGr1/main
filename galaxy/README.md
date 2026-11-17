@@ -12,7 +12,7 @@ A standalone Canvas 2D observatory with 79,950 procedurally generated stars, a 3
 | Toggle the coordinate grid and labels | `G` or the Grid button | Grid button |
 | Toggle telemetry and framing | `H` or the HUD button | HUD button |
 | Reset the camera | `R`, Home, or the Reset button | Reset button |
-| Change orbital speed | 1×, 100×, or 1000× | Same buttons |
+| Change orbital speed | 1×–10× slider in 0.25× steps | Same slider |
 | Fly to a preset | Overview, Edge-On, or Core | Same buttons |
 | Track the Solar System | Locate Sol | Locate Sol |
 | Cycle Optical, Infrared, and H-Alpha | `F` or the spectral band button | Spectral band button |

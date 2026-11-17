@@ -74,7 +74,8 @@
   const playLabel = byId('play-label');
   const grid = byId('grid');
   const hudToggle = byId('hud-toggle');
-  const rates = document.querySelectorAll('#rate [data-speed]');
+  const rate = byId('rate');
+  const rateValue = byId('rate-value');
   const viewButtons = document.querySelectorAll('#viewpoints [data-view]');
   const lens = byId('lens');
   const fps = byId('fps');
@@ -173,6 +174,11 @@
     band = (band + 1) % spectralBands.length;
     byId('band').textContent = spectralBands[band];
     dirty = true;
+  }
+
+  function updateRate() {
+    speed = rate.valueAsNumber;
+    rateValue.textContent = speed.toFixed(2) + '\u00d7';
   }
 
   function zoomAt(factor, x, y, previousX = x, previousY = y) {
@@ -355,6 +361,7 @@
   window.addEventListener('keydown', event => {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     const key = event.key.toLowerCase();
+    if (event.target === rate && (key.startsWith('arrow') || key === 'home' || key === ' ')) return;
     if (key === ' ' && event.target instanceof HTMLButtonElement) return;
     if (event.repeat && [' ', 'g', 'h', 'r', 'f', 'home'].includes(key)) return;
     switch (key) {
@@ -386,12 +393,7 @@
     lens.setAttribute('aria-pressed', String(lensEmphasis));
     dirty = true;
   });
-  for (const button of rates) {
-    button.addEventListener('click', () => {
-      speed = Number(button.dataset.speed);
-      for (const rate of rates) rate.setAttribute('aria-pressed', String(rate === button));
-    });
-  }
+  rate.addEventListener('input', updateRate);
   for (const button of viewButtons) {
     button.addEventListener('click', () => {
       const next = button.dataset.view;
@@ -414,6 +416,7 @@
 
   resize();
   setPaused(paused);
+  updateRate();
   refreshReadouts();
   requestAnimationFrame(animate);
 })();

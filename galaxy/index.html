@@ -34,19 +34,13 @@
         <div><dt>Magnification</dt><dd id="zoom">1.00×</dd></div>
         <div><dt>Galactic years</dt><dd id="epoch">0.000</dd></div>
       </dl>
+      <label class="rate-label" for="rate">Orbital speed <output id="rate-value" for="rate">1.00×</output></label>
+      <input id="rate" type="range" min="1" max="10" step="0.25" value="1">
       <div class="controls">
         <button id="play" type="button" aria-keyshortcuts="Space"><span id="play-label">Pause</span><kbd>Space</kbd></button>
         <button id="grid" type="button" aria-pressed="true" aria-keyshortcuts="G">Grid <kbd>G</kbd></button>
         <button id="reset" type="button" aria-keyshortcuts="R">Reset <kbd>R</kbd></button>
       </div>
-      <fieldset>
-        <legend>Orbital speed</legend>
-        <div class="controls equal" id="rate">
-          <button type="button" data-speed="1" aria-pressed="true">1×</button>
-          <button type="button" data-speed="100" aria-pressed="false">100×</button>
-          <button type="button" data-speed="1000" aria-pressed="false">1000×</button>
-        </div>
-      </fieldset>
       <fieldset>
         <legend>Viewpoint</legend>
         <div class="controls pairs" id="viewpoints">
