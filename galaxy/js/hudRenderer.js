@@ -34,6 +34,7 @@
   const landmarks = [
     { title:'GALACTIC CORE / SGR A*', dx:33, dy:-37, radius:0, phase:0, z:0, fade:16, ink:'#f1c594' },
     { title:'PERSEUS ARM', dx:-33, dy:27, radius:0.438, phase:armPhase(0.438), z:0, fade:6.5, ink:'#a9dfdf' },
+    { title:'SCUTUM-CENTAURUS ARM', dx:31, dy:-24, radius:0.422, phase:armPhase(0.422) + 0.5, z:0, fade:6.5, ink:'#a9dfdf' },
     { title:'ORION SPUR', dx:-28, dy:-21, radius:0.274, phase:armPhase(0.274) + SPUR_OFFSET, z:0, fade:8, ink:'#a9dfdf' },
     { title:'OUTER HALO', dx:32, dy:22, radius:0.73, phase:0.052, z:0.16, fade:3, ink:'#a9dfdf' },
   ];
@@ -193,7 +194,7 @@
       const preferred = 19500 / zoom;
       const power = 10 ** Math.floor(Math.log10(preferred));
       const normalized = preferred / power;
-      const distance = (normalized >= 5 ? 5 : normalized >= 2 ? 2 : 1) * power;
+      const distance = Math.max(500, (normalized >= 5 ? 5 : normalized >= 2 ? 2 : 1) * power);
       if (distance !== scaleDistance) {
         scaleDistance = distance;
         scaleLabel = formatter.format(distance) + ' LY';

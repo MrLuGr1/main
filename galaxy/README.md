@@ -20,11 +20,13 @@ The central bar feeds the stronger Perseus and Scutum–Centaurus arms. The ligh
 
 The three dotted rings mark the inner bar region (12,000 ly), an illustrative habitable-zone reference near the Orion Spur (27,000 ly), and the outer rim of the modeled stellar disk (54,000 ly).
 
+The visible-light palette uses amber and ivory in the bulge and bar, blue-white in young stellar associations along the arms, and faint slate and silver in the outer disk and halo. Twenty-eight procedural H II knots add localized rose and violet emission along the arms. The palette and knot locations are illustrative. [Hubble's Beautiful Universe](https://science.nasa.gov/mission/hubble/multimedia/e-books/)
+
 Disk stars orbit at radius-dependent, softened Keplerian rates. The spiral pattern advances independently, changing the brightness of stars as they cross the arm crests and trailing dust lanes. This is an illustrative model. Measured disk rotation is approximately flat over much of the studied range. One simulated galactic year is calibrated to an orbit near the Orion reference radius. [Observed rotation curve](https://doi.org/10.1088/0004-637X/759/2/131)
 
 ## Rendering and GitHub Pages
 
-- `js/galaxyEngine.js` generates stellar populations, projects them in perspective, and sums depth-weighted light into a reusable pixel buffer.
+- `js/galaxyEngine.js` generates stellar and gas populations, projects them in perspective, and adds depth-weighted light in linear RGB. A shared exposure curve preserves color ratios as overlapping pixels brighten.
 - `js/hudRenderer.js` draws the survey ring, grid, bitmap text, and instrument markings on a transparent canvas.
 - `js/main.js` handles the camera, input, simulation clock, and display refresh. Rendering is capped at 60 Hz. The FPS readout reports measured throughput, which depends on the display, browser, and hardware.
 
