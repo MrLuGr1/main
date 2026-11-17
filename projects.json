@@ -31,5 +31,13 @@
     "url": "Farkle/index.html",
     "category": "web",
     "favorite": false
+  },
+  {
+    "id": "milky-way",
+    "name": "Mléčná dráha",
+    "description": "Rotující pixelová galaxie s přiblížením kolečkem myši.",
+    "url": "galaxy/index.html",
+    "category": "web",
+    "favorite": false
   }
 ]
