@@ -3,14 +3,50 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Milky Way</title>
+  <meta name="description" content="An interactive pixel-art observatory for the Milky Way.">
+  <title>Milky Way Observatory</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./style.css">
-  <script src="./script.js" defer></script>
+  <script src="./js/galaxyEngine.js" defer></script>
+  <script src="./js/hudRenderer.js" defer></script>
+  <script src="./js/main.js" defer></script>
 </head>
 <body>
-  <canvas id="galaxy" tabindex="0" aria-label="Rotating pixel-art Milky Way. Scroll or use plus and minus to zoom. Press Home to reset the view.">
-    Your browser needs Canvas support to display the Milky Way.
-  </canvas>
+  <main id="observatory" aria-label="Milky Way Observatory">
+    <canvas id="galaxy" tabindex="0" aria-label="Milky Way simulation" aria-describedby="camera-help"></canvas>
+    <canvas id="astrometry" aria-hidden="true"></canvas>
+
+    <header id="identity">
+      <div class="eyebrow"><span class="square"></span> Galactic observatory</div>
+      <h1>Milky Way</h1>
+      <p>Barred spiral <span class="separator">/</span> 100,000 ly survey</p>
+    </header>
+
+    <section id="telemetry" aria-label="Camera and simulation controls">
+      <div class="panel-heading">
+        <h2>Telemetry</h2>
+        <span id="mode">Orbit</span>
+      </div>
+      <dl class="readouts">
+        <div><dt>Azimuth</dt><dd id="yaw">000.0°</dd></div>
+        <div><dt>Elevation</dt><dd id="pitch">62.0°</dd></div>
+        <div><dt>Magnification</dt><dd id="zoom">1.00×</dd></div>
+        <div><dt>Galactic years</dt><dd id="epoch">0.000</dd></div>
+      </dl>
+      <label class="rate-label" for="rate">Orbital speed <output id="rate-value" for="rate">1.00×</output></label>
+      <input id="rate" type="range" min="0.25" max="4" step="0.25" value="1">
+      <div class="controls">
+        <button id="play" type="button" aria-keyshortcuts="Space"><span id="play-label">Pause</span><kbd>Space</kbd></button>
+        <button id="grid" type="button" aria-pressed="true" aria-keyshortcuts="G">Grid <kbd>G</kbd></button>
+        <button id="reset" type="button" aria-keyshortcuts="R">Reset <kbd>R</kbd></button>
+      </div>
+    </section>
+
+    <div id="survey" aria-hidden="true"><span id="fps">-- FPS</span><span class="separator">/</span><span id="star-count"></span></div>
+    <p id="camera-help"><span class="pointer-help">Drag to orbit <span class="separator">/</span> Scroll to zoom</span><span class="touch-help">Drag to orbit <span class="separator">/</span> Pinch to zoom</span></p>
+    <button id="hud-toggle" type="button" aria-pressed="true" aria-label="Show telemetry HUD" aria-keyshortcuts="H">HUD <kbd>H</kbd></button>
+    <p id="status" hidden></p>
+    <noscript><p class="status">Enable JavaScript to open the observatory.</p></noscript>
+  </main>
 </body>
 </html>
