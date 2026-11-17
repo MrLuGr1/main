@@ -8,6 +8,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./style.css">
   <script src="./js/galaxyEngine.js" defer></script>
+  <script src="./js/observatoryEffects.js" defer></script>
   <script src="./js/hudRenderer.js" defer></script>
   <script src="./js/main.js" defer></script>
 </head>
@@ -33,13 +34,37 @@
         <div><dt>Magnification</dt><dd id="zoom">1.00×</dd></div>
         <div><dt>Galactic years</dt><dd id="epoch">0.000</dd></div>
       </dl>
-      <label class="rate-label" for="rate">Orbital speed <output id="rate-value" for="rate">1.00×</output></label>
-      <input id="rate" type="range" min="0.25" max="4" step="0.25" value="1">
       <div class="controls">
         <button id="play" type="button" aria-keyshortcuts="Space"><span id="play-label">Pause</span><kbd>Space</kbd></button>
         <button id="grid" type="button" aria-pressed="true" aria-keyshortcuts="G">Grid <kbd>G</kbd></button>
         <button id="reset" type="button" aria-keyshortcuts="R">Reset <kbd>R</kbd></button>
       </div>
+      <fieldset>
+        <legend>Orbital speed</legend>
+        <div class="controls equal" id="rate">
+          <button type="button" data-speed="1" aria-pressed="true">1×</button>
+          <button type="button" data-speed="100" aria-pressed="false">100×</button>
+          <button type="button" data-speed="1000" aria-pressed="false">1000×</button>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Viewpoint</legend>
+        <div class="controls pairs" id="viewpoints">
+          <button type="button" data-view="overview" aria-pressed="true">Overview</button>
+          <button type="button" data-view="edge" aria-pressed="false">Edge-On</button>
+          <button type="button" data-view="core" aria-pressed="false">Core</button>
+          <button id="sol" type="button" data-view="sol" aria-pressed="false"
+            title="Track the Solar System in the Orion Spur">Locate Sol</button>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Spectral band &amp; lens</legend>
+        <div class="controls pairs filters">
+          <button id="spectrum" type="button" aria-keyshortcuts="F"
+            title="Cycle spectral band"><span id="band" aria-live="polite">Optical</span><kbd>F</kbd></button>
+          <button id="lens" type="button" aria-pressed="false" title="Emphasize gravitational lensing">Core lens</button>
+        </div>
+      </fieldset>
     </section>
 
     <div id="survey" aria-hidden="true"><span id="fps">-- FPS</span><span class="separator">/</span><span id="star-count"></span></div>

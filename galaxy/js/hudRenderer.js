@@ -1,7 +1,10 @@
 (() => {
   'use strict';
 
-  const { TAU, SURVEY_RADIUS_LY, PATTERN_SPEED, SPUR_OFFSET, armPhase, clamp, project } = window.MilkyWay;
+  const {
+    TAU, SURVEY_RADIUS_LY, PATTERN_SPEED, SPUR_OFFSET, SOL_RADIUS, SOL_DISTANCE_LY,
+    armPhase, clamp, project, locateSol,
+  } = window.MilkyWay;
   const FONT = {
     A:[14,17,17,31,17,17,17], B:[30,17,17,30,17,17,30], C:[14,17,16,16,16,17,14],
     D:[30,17,17,17,17,17,30], E:[31,16,16,30,16,16,31], F:[31,16,16,30,16,16,16],
@@ -46,7 +49,9 @@
     let width, height, gutter, compact, scaleDistance, scaleLabel;
     const a = { x: 0, y: 0 };
     const b = { x: 0, y: 0 };
+    const sol = { x: 0, y: 0 };
     const formatter = new Intl.NumberFormat('en-US');
+    const solLabel = 'SOL / ' + formatter.format(SOL_DISTANCE_LY) + ' LY';
 
     function resize(nextWidth, nextHeight) {
       width = canvas.width = nextWidth;
@@ -171,7 +176,7 @@
       context.globalAlpha = 1;
     }
 
-    function instruments(projection, zoom) {
+    function instruments(projection, zoom, sceneY) {
       context.fillStyle = '#4b7275';
       for (let i = 0; i < 4; i++) {
         const edge = compact ? 7 : 12;
@@ -184,7 +189,7 @@
       }
 
       const cx = Math.round(width / 2);
-      const cy = Math.round(height / 2);
+      const cy = Math.round(height / 2 + sceneY);
       context.fillStyle = '#3b7b7e';
       context.fillRect(cx - 13, cy, 5, 1);
       context.fillRect(cx + 9, cy, 5, 1);
@@ -209,12 +214,40 @@
       text(scaleLabel, x + length + 9, y - 6);
     }
 
-    function render(projection, zoom, years, showGrid, showHud) {
+    function drawSol(projection, years) {
+      context.fillStyle = '#76906b';
+      ring(projection, SOL_RADIUS, false);
+      locateSol(years, sol);
+      project(projection, sol.x, sol.y, 0, a);
+      const { x, y } = a;
+      if (x < 0 || x >= width || y < 0 || y >= height) return;
+
+      context.fillStyle = '#f8db91';
+      for (let dy = -1; dy <= 1; dy += 2) {
+        for (let dx = -1; dx <= 1; dx += 2) {
+          const cornerX = x + dx * 9;
+          const cornerY = y + dy * 9;
+          context.fillRect(cornerX - (dx > 0 ? 3 : 0), cornerY, 4, 1);
+          context.fillRect(cornerX, cornerY - (dy > 0 ? 3 : 0), 1, 4);
+        }
+      }
+      context.fillRect(x - 1, y - 1, 3, 3);
+      const length = solLabel.length * 6 - 1;
+      const labelX = clamp(x + 16, 6, width - length - 6);
+      const labelY = y >= 21 ? y - 17 : y + 16;
+      context.fillStyle = '#060b0c';
+      context.fillRect(labelX - 3, labelY - 2, length + 6, 11);
+      context.fillStyle = '#f8db91';
+      text(solLabel, labelX, labelY);
+    }
+
+    function render(projection, zoom, years, showGrid, showHud, showSol, sceneY) {
       context.clearRect(0, 0, width, height);
       if (showGrid) grid(projection, zoom, years);
       ring(projection, 1, true);
       if (showGrid) degreeTicks(projection);
-      if (showHud) instruments(projection, zoom);
+      if (showHud) instruments(projection, zoom, sceneY);
+      if (showSol) drawSol(projection, years);
     }
 
     return { resize, render };

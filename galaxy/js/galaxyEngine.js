@@ -27,6 +27,7 @@
   const wrap = (value, period) => ((value % period) + period) % period;
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const armPhase = radius => -0.525 * Math.log(Math.max(ARM_START, radius) / ARM_START);
+  const orbitalSpeed = radius => (0.27 ** 2 / (radius ** 2 + 0.055 ** 2)) ** 0.75;
 
   const wave = new Float32Array(TABLE_SIZE);
   const spur = new Float32Array(TABLE_SIZE);
@@ -47,18 +48,36 @@
     leadingEdge[i] = Math.max(ridge(major - 0.015, 0.014), ridge(minor - 0.012, 0.013));
   }
 
-  const swatches = [
-    0x94a3b8, 0xcbd5e1, 0x64748b, 0xb4afb0, // Diffuse disk and halo
-    0xa8e6ff, 0xd4f4ff, 0x7eb6ff, 0xa6afff, // Young stellar associations
-    0xffdf9e, 0xffb85c, 0xff8c42, 0xffeed5, // Bulge and bar
-    0xff5c8a, 0xd946ef, 0xff7b7b, 0xee5768, // Ionized gas
-  ];
   const linear = channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
-  const colors = new Float32Array(swatches.length * 3);
-  for (let i = 0; i < swatches.length; i++) {
-    colors[3 * i] = linear((swatches[i] >>> 16) / 255);
-    colors[3 * i + 1] = linear(((swatches[i] >>> 8) & 255) / 255);
-    colors[3 * i + 2] = linear((swatches[i] & 255) / 255);
+  // Four swatches each for the disk/halo, young stars, bulge/bar and ionized gas.
+  const bands = [
+    { title: 'Optical', swatches: [
+      0x94a3b8, 0xcbd5e1, 0x64748b, 0xb4afb0,
+      0xa8e6ff, 0xd4f4ff, 0x7eb6ff, 0xa6afff,
+      0xffdf9e, 0xffb85c, 0xff8c42, 0xffeed5,
+      0xff5c8a, 0xd946ef, 0xff7b7b, 0xee5768,
+    ], sensitivity: [1, 1, 1, 1] },
+    { title: 'Infrared', swatches: [
+      0xc99072, 0xceaa8b, 0x986750, 0xd09a80,
+      0xf0bb9e, 0xf4cbb1, 0xc88469, 0xeaa487,
+      0xffc277, 0xffa54b, 0xff763b, 0xffddaa,
+      0xab615e, 0xaf6582, 0xc78068, 0xab544e,
+    ], sensitivity: [0.68, 0.68, 1.38, 0.18] },
+    { title: 'H-Alpha', swatches: [
+      0x8f789c, 0xb6a2bf, 0x73607c, 0xa185a4,
+      0xf876a5, 0xffa5bd, 0xd666a4, 0xf878cf,
+      0xc6889f, 0xbd718d, 0xc25f75, 0xdeb2bc,
+      0xff4d8b, 0xf337cf, 0xffa4bc, 0xff4975,
+    ], sensitivity: [0.36, 0.83, 0.43, 2.4] },
+  ];
+  for (const band of bands) {
+    band.colors = new Float32Array(band.swatches.length * 3);
+    for (const [i, color] of band.swatches.entries()) {
+      const gain = band.sensitivity[i >> 2];
+      band.colors[3 * i] = gain * linear((color >>> 16) / 255);
+      band.colors[3 * i + 1] = gain * linear(((color >>> 8) & 255) / 255);
+      band.colors[3 * i + 2] = gain * linear((color & 255) / 255);
+    }
   }
 
   // A shared exposure per pixel preserves channel ratios as light accumulates.
@@ -110,7 +129,7 @@
       const phase = random();
       const vertical = gaussian() * (0.004 + radius * 0.014);
       // Softened Keplerian omega, normalized to Orion's reference radius.
-      const speed = (0.27 ** 2 / (radius ** 2 + 0.055 ** 2)) ** 0.75;
+      const speed = orbitalSpeed(radius);
       const taper = clamp((0.554 - radius) / 0.112, 0, 1);
       const rise = clamp((radius - 0.09) / 0.078, 0, 1);
       const knots = 0.76 + 0.24 * Math.cos(radius * 107 + Math.sin(radius * 56)) ** 2;
@@ -131,7 +150,7 @@
     }
     for (let i = 0; i < BULGE_STARS; i++) {
       const radius = Math.abs(gaussian()) * 0.039;
-      const speed = (0.27 ** 2 / (radius ** 2 + 0.055 ** 2)) ** 0.75;
+      const speed = orbitalSpeed(radius);
       append(radius, random(), gaussian() * 0.032, speed, luminosity() * 0.61,
         radius < 0.028 ? 11 : 8 + Math.floor(random() * 3));
     }
@@ -196,6 +215,7 @@
     const context = canvas.getContext('2d', { alpha: false });
     if (!context) return null;
     const data = makeStars();
+    const effects = window.MilkyWay.createEffects();
     let width, height, frame, pixels, lightBuffer, litPixels;
 
     function resize(nextWidth, nextHeight) {
@@ -208,8 +228,9 @@
       litPixels = new Uint32Array(pixels.length);
     }
 
-    function render(projection, years, zoom) {
+    function render(projection, years, zoom, band, lensEmphasis, pulseTime) {
       let litCount = 0;
+      const colors = bands[band].colors;
       const pattern = years * PATTERN_SPEED;
       const diskEnd = DISK_STARS * STRIDE;
       const detail = Math.log2(zoom);
@@ -300,6 +321,7 @@
           | packed[CHANNEL_LEVELS + ((green * scale) | 0)]
           | packed[2 * CHANNEL_LEVELS + ((blue * scale) | 0)];
       }
+      effects.render(pixels, width, height, projection, years, zoom, lensEmphasis, pulseTime, band);
       context.putImageData(frame, 0, 0);
     }
 
@@ -308,6 +330,7 @@
 
   window.MilkyWay = {
     TAU, SURVEY_RADIUS_LY, STAR_COUNT, PATTERN_SPEED, SPUR_OFFSET,
-    clamp, wrap, armPhase, createProjection, updateProjection, project, createEngine,
+    spectralBands: bands.map(band => band.title),
+    clamp, wrap, armPhase, orbitalSpeed, createProjection, updateProjection, project, createEngine,
   };
 })();

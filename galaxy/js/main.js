@@ -2,7 +2,8 @@
   'use strict';
 
   const {
-    TAU, STAR_COUNT, clamp, wrap, createEngine, createHud, createProjection, updateProjection,
+    TAU, STAR_COUNT, spectralBands, clamp, wrap, createEngine, createHud,
+    createProjection, updateProjection, project, locateSol,
   } = window.MilkyWay;
   const canvas = document.querySelector('#galaxy');
   const overlay = document.querySelector('#astrometry');
@@ -17,20 +18,38 @@
 
   const FRAME_TIME = 1000 / 60;
   const MAX_ZOOM = 60;
+  const WARP_SECONDS = 0.72;
   const DEFAULT_CAMERA = { yaw: 0.34, pitch: 62 * TAU / 360, zoom: 1, x: 0, y: 0 };
+  const viewpoints = {
+    overview: DEFAULT_CAMERA,
+    edge: { ...DEFAULT_CAMERA, yaw: 0.75, pitch: 0 },
+    core: { ...DEFAULT_CAMERA, pitch: 1.16, zoom: 8 },
+    sol: { ...DEFAULT_CAMERA, pitch: 1.35, zoom: 4.2 },
+  };
   const camera = { ...DEFAULT_CAMERA };
   const target = { ...DEFAULT_CAMERA };
+  const warpStart = { ...DEFAULT_CAMERA };
+  const solProjection = createProjection();
+  const solWorld = { x: 0, y: 0 };
+  const solScreen = { x: 0, y: 0 };
   const starView = createProjection();
   const hudView = createProjection();
   const rasterCamera = { ...DEFAULT_CAMERA };
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   const pointers = new Map();
   let width, height, rasterWidth, rasterHeight, rasterScale, baseScale;
+  let sceneY = 0;
   let yawVelocity = 0;
   let pitchVelocity = 0;
   let lastPointerTime = 0;
   let years = 0;
+  let pulseTime = 0;
   let speed = 1;
+  let band = 0;
+  let lensEmphasis = false;
+  let showSol = false;
+  let viewpoint = 'overview';
+  let warpElapsed = WARP_SECONDS;
   let paused = motion.matches;
   let showGrid = true;
   let showHud = true;
@@ -55,8 +74,9 @@
   const playLabel = byId('play-label');
   const grid = byId('grid');
   const hudToggle = byId('hud-toggle');
-  const rate = byId('rate');
-  const rateValue = byId('rate-value');
+  const rates = document.querySelectorAll('#rate [data-speed]');
+  const viewButtons = document.querySelectorAll('#viewpoints [data-view]');
+  const lens = byId('lens');
   const fps = byId('fps');
 
   byId('star-count').textContent = STAR_COUNT.toLocaleString('en-US') + ' stars';
@@ -70,6 +90,8 @@
     camera.y *= ratio;
     target.x *= ratio;
     target.y *= ratio;
+    warpStart.x *= ratio;
+    warpStart.y *= ratio;
     baseScale = nextScale;
     // Bound raster work even on high-DPI and ultrawide displays.
     rasterScale = Math.min(2 / 3, 960 / width, 640 / height);
@@ -77,7 +99,14 @@
     rasterHeight = Math.max(1, Math.round(height * rasterScale));
     engine.resize(rasterWidth, rasterHeight);
     hud.resize(width, height);
+    updateSceneCenter();
     dirty = true;
+  }
+
+  function updateSceneCenter() {
+    // In portrait layouts, frame the galaxy in the space above the controls.
+    sceneY = showHud && width <= 540 && height >= 560
+      ? Math.round((telemetry.offsetTop + 92 - height) / 2) : 0;
   }
 
   function refreshReadouts() {
@@ -108,21 +137,46 @@
     showHud = !showHud;
     if (!showHud && telemetry.contains(document.activeElement)) hudToggle.focus();
     telemetry.hidden = identity.hidden = survey.hidden = help.hidden = !showHud;
+    updateSceneCenter();
     hudToggle.setAttribute('aria-pressed', String(showHud));
     if (showHud) refreshReadouts();
     dirty = true;
   }
 
-  function resetCamera() {
-    // Approach the default orientation along the shorter arc.
-    const yaw = camera.yaw + wrap(DEFAULT_CAMERA.yaw - camera.yaw + Math.PI, TAU) - Math.PI;
-    Object.assign(target, DEFAULT_CAMERA);
-    target.yaw = yaw;
+  function updateViewButtons() {
+    for (const button of viewButtons) {
+      const active = button.dataset.view === 'sol' ? showSol : button.dataset.view === viewpoint;
+      button.setAttribute('aria-pressed', String(active));
+    }
+  }
+
+  function warpTo(next) {
+    viewpoint = next;
+    Object.assign(warpStart, camera);
+    Object.assign(target, viewpoints[next]);
+    target.yaw = camera.yaw + wrap(target.yaw - camera.yaw + Math.PI, TAU) - Math.PI;
     yawVelocity = pitchVelocity = 0;
+    warpElapsed = 0;
+    updateViewButtons();
+    dirty = true;
+  }
+
+  function releaseView() {
+    if (!viewpoint) return;
+    if (warpElapsed < WARP_SECONDS || viewpoint === 'sol') Object.assign(target, camera);
+    viewpoint = null;
+    warpElapsed = WARP_SECONDS;
+    updateViewButtons();
+  }
+
+  function cycleBand() {
+    band = (band + 1) % spectralBands.length;
+    byId('band').textContent = spectralBands[band];
     dirty = true;
   }
 
   function zoomAt(factor, x, y, previousX = x, previousY = y) {
+    releaseView();
     const zoom = clamp(target.zoom * factor, 1, MAX_ZOOM);
     const ratio = zoom / target.zoom;
     target.x = x + (target.x - previousX) * ratio;
@@ -134,6 +188,7 @@
   }
 
   function orbit(dx, dy) {
+    releaseView();
     target.yaw += dx * 0.007;
     target.pitch = clamp(target.pitch + dy * 0.0055, 0, Math.PI / 2);
     dirty = true;
@@ -175,7 +230,7 @@
     const oldDistance = Math.hypot(oldX - other.x, oldY - other.y);
     const rect = canvas.getBoundingClientRect();
     const originX = rect.left + width / 2;
-    const originY = rect.top + height / 2;
+    const originY = rect.top + height / 2 + sceneY;
     zoomAt(distance / Math.max(1, oldDistance), (point.x + other.x) / 2 - originX,
       (point.y + other.y) / 2 - originY, (oldX + other.x) / 2 - originX, (oldY + other.y) / 2 - originY);
   }
@@ -189,6 +244,33 @@
   }
 
   function updateCamera(seconds) {
+    if (warpElapsed < WARP_SECONDS || viewpoint === 'sol') {
+      const moving = warpElapsed < WARP_SECONDS;
+      warpElapsed = motion.matches ? WARP_SECONDS : Math.min(WARP_SECONDS, warpElapsed + seconds);
+      const progress = warpElapsed / WARP_SECONDS;
+      const ease = progress * progress * (3 - 2 * progress);
+      camera.yaw = warpStart.yaw + (target.yaw - warpStart.yaw) * ease;
+      camera.pitch = warpStart.pitch + (target.pitch - warpStart.pitch) * ease;
+      camera.zoom = warpStart.zoom * (target.zoom / warpStart.zoom) ** ease;
+      let x = target.x;
+      let y = target.y;
+      if (viewpoint === 'sol') {
+        locateSol(years, solWorld);
+        // Project without pan to derive the exact offset for the current orientation.
+        camera.x = camera.y = 0;
+        updateProjection(solProjection, 0, 0, baseScale, camera);
+        project(solProjection, solWorld.x, solWorld.y, 0, solScreen);
+        x = -solScreen.x;
+        y = -solScreen.y;
+      }
+      camera.x = warpStart.x + (x - warpStart.x) * ease;
+      camera.y = warpStart.y + (y - warpStart.y) * ease;
+      if (progress === 1 && viewpoint !== 'sol') {
+        target.yaw = camera.yaw = wrap(target.yaw, TAU);
+        Object.assign(camera, target);
+      }
+      return moving;
+    }
     if (!pointers.size) {
       const decay = Math.exp(-8 * seconds);
       const travel = (1 - decay) / 8;
@@ -224,18 +306,22 @@
     nextFrame += FRAME_TIME * (1 + Math.floor((now + 0.8 - nextFrame) / FRAME_TIME));
     const seconds = Math.min((now - (previousTime ?? now - FRAME_TIME)) / 1000, 0.05);
     previousTime = now;
+    if (!paused) {
+      years += seconds * speed / 78;
+      pulseTime += seconds;
+    }
     const moving = updateCamera(seconds);
-    if (!paused) years += seconds * speed / 78;
     if (dirty || moving || !paused) {
       rasterCamera.yaw = camera.yaw;
       rasterCamera.pitch = camera.pitch;
       rasterCamera.zoom = camera.zoom;
       rasterCamera.x = camera.x * rasterScale;
-      rasterCamera.y = camera.y * rasterScale;
+      rasterCamera.y = (camera.y + sceneY) * rasterScale;
       updateProjection(starView, rasterWidth, rasterHeight, baseScale * rasterScale, rasterCamera);
       updateProjection(hudView, width, height, baseScale, camera);
-      engine.render(starView, years, camera.zoom);
-      hud.render(hudView, camera.zoom, years, showGrid, showHud);
+      hudView.cy += sceneY;
+      engine.render(starView, years, camera.zoom, band, lensEmphasis, pulseTime);
+      hud.render(hudView, camera.zoom, years, showGrid, showHud, showSol, sceneY);
       renderedFrames++;
       dirty = false;
     }
@@ -263,21 +349,21 @@
     const units = event.deltaMode;
     const delta = event.deltaY * (units === 1 ? 16 : units === 2 ? height : 1);
     zoomAt(Math.exp(-clamp(delta, -260, 260) * 0.0025), event.clientX - rect.left - width / 2,
-      event.clientY - rect.top - height / 2);
+      event.clientY - rect.top - height / 2 - sceneY);
   }, { passive: false });
 
   window.addEventListener('keydown', event => {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     const key = event.key.toLowerCase();
-    if (event.target === rate && (key.startsWith('arrow') || key === 'home' || key === ' ')) return;
     if (key === ' ' && event.target instanceof HTMLButtonElement) return;
-    if (event.repeat && (key === ' ' || key === 'g' || key === 'h' || key === 'r')) return;
+    if (event.repeat && [' ', 'g', 'h', 'r', 'f', 'home'].includes(key)) return;
     switch (key) {
       case ' ': setPaused(!paused); break;
       case 'g': toggleGrid(); break;
       case 'h': toggleHud(); break;
+      case 'f': cycleBand(); break;
       case 'r':
-      case 'home': resetCamera(); break;
+      case 'home': warpTo('overview'); break;
       case '+':
       case '=': zoomAt(1.32, 0, 0); break;
       case '-': zoomAt(1 / 1.32, 0, 0); break;
@@ -293,11 +379,34 @@
   play.addEventListener('click', () => setPaused(!paused));
   grid.addEventListener('click', toggleGrid);
   hudToggle.addEventListener('click', toggleHud);
-  byId('reset').addEventListener('click', resetCamera);
-  rate.addEventListener('input', () => {
-    speed = Number(rate.value);
-    rateValue.textContent = speed.toFixed(2) + '\u00d7';
+  byId('reset').addEventListener('click', () => warpTo('overview'));
+  byId('spectrum').addEventListener('click', cycleBand);
+  lens.addEventListener('click', () => {
+    lensEmphasis = !lensEmphasis;
+    lens.setAttribute('aria-pressed', String(lensEmphasis));
+    dirty = true;
   });
+  for (const button of rates) {
+    button.addEventListener('click', () => {
+      speed = Number(button.dataset.speed);
+      for (const rate of rates) rate.setAttribute('aria-pressed', String(rate === button));
+    });
+  }
+  for (const button of viewButtons) {
+    button.addEventListener('click', () => {
+      const next = button.dataset.view;
+      if (next === 'sol') {
+        showSol = !showSol;
+        if (!showSol) {
+          if (viewpoint === 'sol') releaseView();
+          updateViewButtons();
+          dirty = true;
+          return;
+        }
+      }
+      warpTo(next);
+    });
+  }
   motion.addEventListener('change', event => {
     if (event.matches) setPaused(true);
   });
