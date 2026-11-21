@@ -3,7 +3,7 @@
 
   const {
     TAU, STAR_COUNT, spectralBands, clamp, wrap, createEngine, createHud,
-    createProjection, updateProjection, project, locateSol,
+    createProjection, updateProjection, project, locateSol, pulsars, locatePulsar, createSignalTrace,
   } = window.MilkyWay;
   const canvas = document.querySelector('#galaxy');
   const overlay = document.querySelector('#astrometry');
@@ -25,13 +25,14 @@
     edge: { ...DEFAULT_CAMERA, yaw: 0.75, pitch: 0 },
     core: { ...DEFAULT_CAMERA, pitch: 1.16, zoom: 8 },
     sol: { ...DEFAULT_CAMERA, pitch: 1.35, zoom: 4.2 },
+    pulsar: { ...DEFAULT_CAMERA, pitch: 1.22, zoom: 3.6 },
   };
   const camera = { ...DEFAULT_CAMERA };
   const target = { ...DEFAULT_CAMERA };
   const warpStart = { ...DEFAULT_CAMERA };
-  const solProjection = createProjection();
-  const solWorld = { x: 0, y: 0 };
-  const solScreen = { x: 0, y: 0 };
+  const focusProjection = createProjection();
+  const focusWorld = { x: 0, y: 0 };
+  const focusScreen = { x: 0, y: 0 };
   const starView = createProjection();
   const hudView = createProjection();
   const rasterCamera = { ...DEFAULT_CAMERA };
@@ -48,6 +49,7 @@
   let band = 0;
   let lensEmphasis = false;
   let showSol = false;
+  let trackedPulsar = null;
   let viewpoint = 'overview';
   let warpElapsed = WARP_SECONDS;
   let paused = motion.matches;
@@ -79,6 +81,12 @@
   const viewButtons = document.querySelectorAll('#viewpoints [data-view]');
   const lens = byId('lens');
   const fps = byId('fps');
+  const receiver = byId('pulsar');
+  const signal = byId('signal');
+  const drawSignal = createSignalTrace(byId('pulse-trace'));
+  for (const pulsar of pulsars) {
+    receiver.add(new Option(pulsar.name + ' · ' + pulsar.frequency.toFixed(2) + ' Hz', pulsar.name));
+  }
 
   byId('star-count').textContent = STAR_COUNT.toLocaleString('en-US') + ' stars';
 
@@ -157,6 +165,7 @@
   }
 
   function warpTo(next) {
+    if (next !== 'pulsar' && trackedPulsar) updateReceiver(null);
     viewpoint = next;
     Object.assign(warpStart, camera);
     Object.assign(target, viewpoints[next]);
@@ -169,10 +178,49 @@
 
   function releaseView() {
     if (!viewpoint) return;
-    if (warpElapsed < WARP_SECONDS || viewpoint === 'sol') Object.assign(target, camera);
+    if (warpElapsed < WARP_SECONDS || viewpoint === 'sol' || trackedPulsar) Object.assign(target, camera);
+    if (trackedPulsar) updateReceiver(null);
     viewpoint = null;
     warpElapsed = WARP_SECONDS;
     updateViewButtons();
+  }
+
+  function updateReceiver(pulsar) {
+    trackedPulsar = pulsar;
+    receiver.value = pulsar?.name ?? '';
+    signal.hidden = !pulsar;
+    if (pulsar) {
+      byId('signal-hz').textContent = pulsar.frequency.toFixed(2) + ' Hz';
+      byId('signal-period').textContent = (1 / pulsar.frequency).toFixed(2) + ' s';
+      telemetry.scrollTop = 0;
+    }
+    frameScene();
+    dirty = true;
+  }
+
+  function trackPulsar(pulsar) {
+    if (trackedPulsar === pulsar) return;
+    updateReceiver(pulsar);
+    warpTo('pulsar');
+  }
+
+  function pickPulsar(event) {
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+    let nearest;
+    let bestDistance = event.pointerType === 'touch' ? 16 : 10;
+    for (const pulsar of pulsars) {
+      locatePulsar(pulsar, years, focusWorld);
+      project(hudView, focusWorld.x, focusWorld.y, 0, focusScreen);
+      const distance = Math.hypot(x - focusScreen.x, y - focusScreen.y);
+      if (distance <= bestDistance) {
+        nearest = pulsar;
+        bestDistance = distance;
+      }
+    }
+    if (nearest) trackPulsar(nearest);
   }
 
   function cycleBand() {
@@ -208,9 +256,11 @@
   function pointerDown(event) {
     if ((event.pointerType === 'mouse' && event.button !== 0) || pointers.size >= 2) return;
     event.preventDefault();
+    if (document.activeElement === receiver) canvas.focus({ preventScroll: true });
     canvas.setPointerCapture(event.pointerId);
     canvas.classList.add('dragging');
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    for (const point of pointers.values()) point.tap = false;
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, tap: pointers.size === 0 });
     yawVelocity = pitchVelocity = 0;
     lastPointerTime = event.timeStamp;
   }
@@ -218,6 +268,8 @@
   function pointerMove(event) {
     const point = pointers.get(event.pointerId);
     if (!point) return;
+    if (point.tap && Math.hypot(event.clientX - point.x, event.clientY - point.y) < 5) return;
+    point.tap = false;
     const oldX = point.x;
     const oldY = point.y;
     point.x = event.clientX;
@@ -247,15 +299,20 @@
   }
 
   function pointerEnd(event) {
-    if (!pointers.delete(event.pointerId)) return;
+    const point = pointers.get(event.pointerId);
+    if (!point) return;
+    pointers.delete(event.pointerId);
     if (!pointers.size) canvas.classList.remove('dragging');
+    if (event.type === 'pointerup' && point.tap && Math.hypot(event.clientX - point.x, event.clientY - point.y) < 5) {
+      pickPulsar(event);
+    }
     if (motion.matches || event.type !== 'pointerup' || event.timeStamp - lastPointerTime > 100) {
       yawVelocity = pitchVelocity = 0;
     }
   }
 
   function updateCamera(seconds) {
-    if (warpElapsed < WARP_SECONDS || viewpoint === 'sol') {
+    if (warpElapsed < WARP_SECONDS || viewpoint === 'sol' || trackedPulsar) {
       const moving = warpElapsed < WARP_SECONDS;
       warpElapsed = motion.matches ? WARP_SECONDS : Math.min(WARP_SECONDS, warpElapsed + seconds);
       const progress = warpElapsed / WARP_SECONDS;
@@ -265,18 +322,19 @@
       camera.zoom = warpStart.zoom * (target.zoom / warpStart.zoom) ** ease;
       let x = target.x;
       let y = target.y;
-      if (viewpoint === 'sol') {
-        locateSol(years, solWorld);
+      if (viewpoint === 'sol' || trackedPulsar) {
+        if (trackedPulsar) locatePulsar(trackedPulsar, years, focusWorld);
+        else locateSol(years, focusWorld);
         // Project without pan to derive the exact offset for the current orientation.
         camera.x = camera.y = 0;
-        updateProjection(solProjection, 0, 0, baseScale, camera);
-        project(solProjection, solWorld.x, solWorld.y, 0, solScreen);
-        x = -solScreen.x;
-        y = -solScreen.y;
+        updateProjection(focusProjection, 0, 0, baseScale, camera);
+        project(focusProjection, focusWorld.x, focusWorld.y, 0, focusScreen);
+        x = -focusScreen.x;
+        y = -focusScreen.y;
       }
       camera.x = warpStart.x + (x - warpStart.x) * ease;
       camera.y = warpStart.y + (y - warpStart.y) * ease;
-      if (progress === 1 && viewpoint !== 'sol') {
+      if (progress === 1 && viewpoint !== 'sol' && !trackedPulsar) {
         target.yaw = camera.yaw = wrap(target.yaw, TAU);
         Object.assign(camera, target);
       }
@@ -332,7 +390,8 @@
       updateProjection(hudView, width, height, baseScale, camera);
       hudView.cy += sceneY;
       engine.render(starView, years, camera.zoom, band, lensEmphasis, pulseTime);
-      hud.render(hudView, camera.zoom, years, showGrid, showHud, showSol, sceneY);
+      hud.render(hudView, camera.zoom, years, showGrid, showHud, showSol, sceneY, trackedPulsar, pulseTime);
+      if (showHud && trackedPulsar) drawSignal?.(trackedPulsar, pulseTime);
       renderedFrames++;
       dirty = false;
     }
@@ -366,6 +425,7 @@
   window.addEventListener('keydown', event => {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     const key = event.key.toLowerCase();
+    if (event.target === receiver) return;
     if (event.target === rate && (key.startsWith('arrow') || key === 'home' || key === ' ')) return;
     if (key === ' ' && event.target instanceof HTMLButtonElement) return;
     if (event.repeat && [' ', 'g', 'h', 'r', 'f', 'home'].includes(key)) return;
@@ -399,6 +459,11 @@
     dirty = true;
   });
   rate.addEventListener('input', updateRate);
+  receiver.addEventListener('change', () => {
+    const pulsar = pulsars.find(beacon => beacon.name === receiver.value);
+    if (pulsar) trackPulsar(pulsar);
+    else if (trackedPulsar) releaseView();
+  });
   for (const button of viewButtons) {
     button.addEventListener('click', () => {
       const next = button.dataset.view;

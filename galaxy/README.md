@@ -15,6 +15,7 @@ A standalone Canvas 2D observatory with 79,950 procedurally generated stars, a 3
 | Change orbital speed | 1×–10× slider in 0.25× steps | Same slider |
 | Fly to a preset | Overview, Edge-On, or Core | Same buttons |
 | Track the Solar System | Locate Sol | Locate Sol |
+| Track a pulsar and inspect its signal | Click a beacon or choose it in Pulsar receiver | Tap a beacon or choose it in Pulsar receiver |
 | Cycle Optical, Infrared, and H-Alpha | `F` or the spectral band button | Spectral band button |
 | Emphasize the lens around Sagittarius A* | Core lens | Core lens |
 
@@ -29,6 +30,8 @@ Optical uses amber and ivory in the bulge and bar, blue-white in young stellar a
 Locate Sol tracks a model Solar System placed 26,000 ly out in the Orion Spur. Its circular orbit brightens along the arc it has just traveled. Moving the camera releases tracking and leaves the reticle visible. Select Locate Sol again to resume tracking. Selecting the button while tracking hides the reticle and orbit. Eight representative pulsars flash at distinct rates between 0.82 and 2.81 Hz. Their flash clock runs independently of the orbital multiplier and freezes on Pause. The core lens automatically strengthens on approach and can be emphasized at any zoom. It uses an illustrative radial distortion around Sagittarius A*.
 
 The procedural background stars drift as you turn the camera. The disk-plane inset shows the tilt of the galactic disk and marks its zero-degree direction in amber.
+
+The Pulsar receiver tracks any of the eight simulated beacons and plots the last two seconds of its model pulse signal. The plot and target marker use the same pulse clock as the beacon, so pausing freezes all three. Dragging, zooming, changing viewpoint, or clearing the selection releases the target.
 
 Disk stars orbit at radius-dependent, softened Keplerian rates. The spiral pattern advances independently, changing the brightness of stars as they cross the arm crests and trailing dust lanes. This is an illustrative model. Measured disk rotation is approximately flat over much of the studied range. One simulated galactic year is calibrated to an orbit near the Orion reference radius. [Observed rotation curve](https://doi.org/10.1088/0004-637X/759/2/131)
 

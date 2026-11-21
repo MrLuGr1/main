@@ -19,10 +19,22 @@
     [0.306, 0.00, 1.64], [0.351, 0.50, 1.93], [0.404, 0.25, 2.24],
     [0.451, 0.75, 2.56], [0.480, 0.00, 2.81],
   ].map(([radius, arm, frequency], index) => ({
-    radius, frequency, phase: armPhase(radius) + arm + 0.013
+    name: 'PSR 0' + (index + 1), radius, frequency, phase: armPhase(radius) + arm + 0.013
       + 0.009 * Math.sin(radius * 42) + 0.004 * Math.sin(radius * 101),
     pulseOffset: index * 0.381966,
   }));
+
+  function locatePulsar(pulsar, years, position) {
+    const angle = TAU * (pulsar.phase + years * PATTERN_SPEED);
+    position.x = pulsar.radius * Math.cos(angle);
+    position.y = pulsar.radius * Math.sin(angle);
+  }
+
+  function pulseLevel(pulsar, time) {
+    const phase = time * pulsar.frequency + pulsar.pulseOffset;
+    const cycle = phase - Math.floor(phase);
+    return cycle < 0.10 ? 2 : cycle < 0.20 ? 1 : 0;
+  }
 
   const colors = new Uint32Array(9);
   new Uint8Array(colors.buffer).set([
@@ -106,14 +118,14 @@
       lens(pixels, width, height, projection, zoom, emphasis);
       const palette = band * 3;
       for (const pulsar of pulsars) {
-        const angle = TAU * (pulsar.phase + years * PATTERN_SPEED);
-        project(projection, pulsar.radius * Math.cos(angle), pulsar.radius * Math.sin(angle), 0, point);
+        locatePulsar(pulsar, years, point);
+        project(projection, point.x, point.y, 0, point);
         const { x, y } = point;
         if (x < 0 || x >= width || y < 0 || y >= height) continue;
-        const cycle = (pulseTime * pulsar.frequency + pulsar.pulseOffset) % 1;
+        const level = pulseLevel(pulsar, pulseTime);
         const pixel = y * width + x;
-        pixels[pixel] = colors[palette + (cycle < 0.10 ? 2 : cycle < 0.20 ? 1 : 0)];
-        if (cycle < 0.10 && x > 0 && x + 1 < width && y > 0 && y + 1 < height) {
+        pixels[pixel] = colors[palette + level];
+        if (level === 2 && x > 0 && x + 1 < width && y > 0 && y + 1 < height) {
           pixels[pixel - 1] = pixels[pixel + 1] = colors[palette + 1];
           pixels[pixel - width] = pixels[pixel + width] = colors[palette + 1];
         }
@@ -123,5 +135,7 @@
     return { drawBackground, render };
   }
 
-  Object.assign(window.MilkyWay, { SOL_RADIUS, SOL_DISTANCE_LY, locateSol, createEffects });
+  Object.assign(window.MilkyWay, {
+    SOL_RADIUS, SOL_DISTANCE_LY, locateSol, pulsars, locatePulsar, pulseLevel, createEffects,
+  });
 })();

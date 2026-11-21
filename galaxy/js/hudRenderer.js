@@ -3,7 +3,7 @@
 
   const {
     TAU, SURVEY_RADIUS_LY, PATTERN_SPEED, SPUR_OFFSET, SOL_RADIUS, SOL_DISTANCE_LY,
-    armPhase, clamp, project, locateSol,
+    armPhase, clamp, project, locateSol, locatePulsar, pulseLevel,
   } = window.MilkyWay;
   const FONT = {
     A:[14,17,17,31,17,17,17], B:[30,17,17,30,17,17,30], C:[14,17,16,16,16,17,14],
@@ -53,6 +53,7 @@
     const a = { x: 0, y: 0 };
     const b = { x: 0, y: 0 };
     const sol = { x: 0, y: 0 };
+    const receiverTarget = { x: 0, y: 0, radius: 0, labelX: 0, labelY: 0 };
     const formatter = new Intl.NumberFormat('en-US');
     const solLabel = 'SOL / ' + formatter.format(SOL_DISTANCE_LY) + ' LY';
 
@@ -137,7 +138,7 @@
       }
     }
 
-    function grid(projection, zoom, years) {
+    function grid(projection, zoom, years, target) {
       for (const radius of gridRadii) {
         context.fillStyle = radius === 0.27 ? '#376366' : '#263e40';
         ring(projection, radius, false);
@@ -165,6 +166,8 @@
         const leftward = landmark.dx < 0;
         const labelX = clamp(a.x + landmark.dx - (leftward ? length : 0), 8, width - length - 8);
         const labelY = clamp(a.y + landmark.dy, 12, height - 15);
+        if (target && labelX - 4 < target.labelX + 39 && labelX + length + 4 > target.labelX
+          && Math.abs(labelY - target.labelY) < 13) continue;
         const elbowX = leftward ? labelX + length : labelX;
         context.globalAlpha = opacity;
         context.fillStyle = landmark.ink;
@@ -286,17 +289,71 @@
       text(solLabel, labelX, labelY);
     }
 
-    function render(projection, zoom, years, showGrid, showHud, showSol, sceneY) {
+    function drawPulsar(pulsar, target) {
+      const { x, y, radius, labelX, labelY } = target;
+      context.fillStyle = radius === 13 ? '#dbffff' : '#7ae3e6';
+      for (let side = -1; side <= 1; side += 2) {
+        line(x + side * radius, y, x + side * (radius - 4), y - 4);
+        line(x + side * radius, y, x + side * (radius - 4), y + 4);
+      }
+      context.fillStyle = '#060b0c';
+      context.fillRect(labelX - 2, labelY - 2, 39, 11);
+      context.fillStyle = '#9ceff0';
+      text(pulsar.name, labelX, labelY);
+    }
+
+    function render(projection, zoom, years, showGrid, showHud, showSol, sceneY, pulsar, pulseTime) {
       context.clearRect(0, 0, width, height);
-      if (showGrid) grid(projection, zoom, years);
+      let target;
+      if (pulsar) {
+        locatePulsar(pulsar, years, receiverTarget);
+        project(projection, receiverTarget.x, receiverTarget.y, 0, receiverTarget);
+        const { x, y } = receiverTarget;
+        if (x >= 0 && x < width && y >= 0 && y < height) {
+          target = receiverTarget;
+          target.radius = 9 + pulseLevel(pulsar, pulseTime) * 2;
+          target.labelX = clamp(x + target.radius + 6, 3, width - 40);
+          target.labelY = Math.max(3, y - 16);
+        }
+      }
+      if (showGrid) grid(projection, zoom, years, target);
       ring(projection, 1, true);
       if (showGrid) degreeTicks(projection);
       if (showHud) instruments(projection, zoom, sceneY);
       if (showSol) drawSol(projection, years);
+      if (target) drawPulsar(pulsar, target);
     }
 
     return { resize, render };
   }
 
-  window.MilkyWay.createHud = createHud;
+  function createSignalTrace(canvas) {
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+    const { width, height } = canvas;
+    context.imageSmoothingEnabled = false;
+    return (pulsar, time) => {
+      context.fillStyle = '#070e10';
+      context.fillRect(0, 0, width, height);
+      context.fillStyle = '#1b3034';
+      for (let x = 6; x < width; x += 16) context.fillRect(x, 0, 1, height);
+      for (let y = 7; y < height; y += 14) context.fillRect(0, y, width, 1);
+
+      const last = width - 7;
+      const baseline = height - 8;
+      let previous;
+      context.fillStyle = '#74d6d6';
+      for (let x = 6; x <= last; x++) {
+        const sample = time - 2 * (last - x) / (last - 6);
+        const y = baseline - 13 * pulseLevel(pulsar, sample);
+        previous ??= y;
+        context.fillRect(x, Math.min(y, previous), 1, Math.abs(y - previous) + 1);
+        previous = y;
+      }
+      context.fillStyle = previous === baseline ? '#9ceff0' : '#ecffff';
+      context.fillRect(last - 1, previous - 1, 3, 3);
+    };
+  }
+
+  Object.assign(window.MilkyWay, { createHud, createSignalTrace });
 })();

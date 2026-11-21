@@ -28,6 +28,21 @@
         <h2>Telemetry</h2>
         <span id="mode">Orbit</span>
       </div>
+      <fieldset id="receiver">
+        <legend><label for="pulsar">Pulsar receiver</label></legend>
+        <select id="pulsar">
+          <option value="">Choose a beacon</option>
+        </select>
+        <div id="signal" hidden>
+          <div class="trace-caption" aria-hidden="true"><span>Pulse signal</span><span>2 s</span></div>
+          <canvas id="pulse-trace" width="180" height="44" role="img"
+            aria-label="Live plot of the simulated pulse signal over two seconds"></canvas>
+          <dl class="signal-readout" aria-live="polite">
+            <div><dt>Frequency</dt><dd id="signal-hz"></dd></div>
+            <div><dt>Period</dt><dd id="signal-period"></dd></div>
+          </dl>
+        </div>
+      </fieldset>
       <dl class="readouts">
         <div><dt>Azimuth</dt><dd id="yaw">000.0°</dd></div>
         <div><dt>Elevation</dt><dd id="pitch">62.0°</dd></div>
