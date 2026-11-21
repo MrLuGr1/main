@@ -34,6 +34,9 @@
   const gridRadii = [0.12, 0.27, 0.54];
   const tickText = ['0/360\u00b0', '45\u00b0', '90\u00b0', '135\u00b0', '180\u00b0', '225\u00b0', '270\u00b0', '315\u00b0'];
   const boundaryInk = ['#215b60', '#27666b', '#347d82', '#49989d', '#6dbec2', '#739c92', '#a3835b', '#b99463', '#977653'];
+  const solTrailInk = ['#53604a', '#7f8051', '#b6a162', '#e6c67d'];
+  const SOL_TRAIL_STEPS = 24;
+  const SOL_TRAIL_ARC = TAU / 9;
   const landmarks = [
     { title:'GALACTIC CORE / SGR A*', dx:33, dy:-37, radius:0, phase:0, z:0, fade:16, ink:'#f1c594' },
     { title:'PERSEUS ARM', dx:-33, dy:27, radius:0.438, phase:armPhase(0.438), z:0, fade:6.5, ink:'#a9dfdf' },
@@ -176,6 +179,36 @@
       context.globalAlpha = 1;
     }
 
+    function diskPlane(projection, x, y) {
+      const rx = compact ? 22 : 30;
+      const ry = projection.pitchSin * (compact ? 11 : 14);
+      const cx = x + (compact ? 34 : 43);
+      const cy = y + 31;
+      context.fillStyle = '#060b0c';
+      context.fillRect(x, y, compact ? 69 : 88, 49);
+      context.fillStyle = '#283d40';
+      context.fillRect(x, y, compact ? 69 : 88, 1);
+      context.fillStyle = '#9ccece';
+      text('DISK PLANE', x + 5, y + 6);
+
+      context.fillStyle = '#4b797d';
+      let px = cx + rx;
+      let py = cy;
+      for (let i = 12; i <= RING_SAMPLES; i += 12) {
+        const nextX = cx + Math.round(rx * circle[2 * i]);
+        const nextY = cy + Math.round(ry * circle[2 * i + 1]);
+        line(px, py, nextX, nextY);
+        px = nextX;
+        py = nextY;
+      }
+      const zeroX = cx + Math.round(rx * projection.yawCos);
+      const zeroY = cy + Math.round(ry * projection.yawSin);
+      context.fillStyle = '#7d9290';
+      line(cx, cy, zeroX, zeroY);
+      context.fillStyle = '#ffc487';
+      context.fillRect(zeroX - 1, zeroY - 1, 3, 3);
+    }
+
     function instruments(projection, zoom, sceneY) {
       context.fillStyle = '#4b7275';
       for (let i = 0; i < 4; i++) {
@@ -207,6 +240,7 @@
       const length = Math.round(projection.scale * distance / SURVEY_RADIUS_LY);
       const x = gutter;
       const y = height - gutter - 27;
+      if (width >= 310 && height >= 250) diskPlane(projection, x, y - 60);
       context.fillStyle = '#9ccece';
       context.fillRect(x, y, length + 1, 1);
       context.fillRect(x, y - 4, 1, 5);
@@ -218,6 +252,17 @@
       context.fillStyle = '#76906b';
       ring(projection, SOL_RADIUS, false);
       locateSol(years, sol);
+      const angle = Math.atan2(sol.y, sol.x);
+      project(projection, SOL_RADIUS * Math.cos(angle - SOL_TRAIL_ARC),
+        SOL_RADIUS * Math.sin(angle - SOL_TRAIL_ARC), 0, a);
+      for (let i = 0; i < SOL_TRAIL_STEPS; i++) {
+        const phase = angle - SOL_TRAIL_ARC * (1 - (i + 1) / SOL_TRAIL_STEPS);
+        project(projection, SOL_RADIUS * Math.cos(phase), SOL_RADIUS * Math.sin(phase), 0, b);
+        context.fillStyle = solTrailInk[Math.floor(i * solTrailInk.length / SOL_TRAIL_STEPS)];
+        line(a.x, a.y, b.x, b.y);
+        a.x = b.x;
+        a.y = b.y;
+      }
       project(projection, sol.x, sol.y, 0, a);
       const { x, y } = a;
       if (x < 0 || x >= width || y < 0 || y >= height) return;

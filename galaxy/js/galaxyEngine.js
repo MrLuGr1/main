@@ -303,9 +303,9 @@
         }
       }
 
-      // The surrounding black field only needs a fast fill. Tone-map and clear
-      // the light buffer at the pixels hit by this frame's projected samples.
+      // Paint the distant field first, then tone-map only the projected samples.
       pixels.fill(packed[0]);
+      effects.drawBackground(pixels, width, height, projection);
       for (let i = 0; i < litCount; i++) {
         const offset = litPixels[i];
         const pixel = offset * 3;

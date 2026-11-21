@@ -31,6 +31,30 @@
     154, 100, 139, 255, 246, 128, 196, 255, 255, 220, 246, 255,
   ]);
 
+  const backgroundInk = new Uint32Array(4);
+  new Uint8Array(backgroundInk.buffer).set([
+    14, 23, 34, 255, 23, 35, 49, 255, 37, 51, 68, 255, 63, 81, 100, 255,
+  ]);
+  let skySeed = 0x534b5931;
+  function skyRandom() {
+    skySeed = (Math.imul(skySeed, 1664525) + 1013904223) >>> 0;
+    return skySeed / 4294967296;
+  }
+  const distantStars = Array.from({ length: 320 }, () => ({
+    u: skyRandom(), v: skyRandom(), level: Math.floor(skyRandom() ** 2.2 * backgroundInk.length),
+  }));
+
+  function drawBackground(pixels, width, height, projection) {
+    // Distant stars drift with viewing angle and retain their size when the disk is zoomed.
+    const driftX = 1 + projection.yawSin * 0.045;
+    const driftY = 1 + (projection.pitchCos * 0.04 + projection.yawCos * 0.016);
+    for (const { u, v, level } of distantStars) {
+      const x = Math.floor((u + driftX) * width) % width;
+      const y = Math.floor((v + driftY) * height) % height;
+      pixels[y * width + x] = backgroundInk[level];
+    }
+  }
+
   const MAX_LENS_RADIUS = 64;
   const FALLOFF_STEPS = 512;
   const falloff = Float32Array.from({ length: FALLOFF_STEPS + 1 }, (_, i) => {
@@ -96,7 +120,7 @@
       }
     }
 
-    return { render };
+    return { drawBackground, render };
   }
 
   Object.assign(window.MilkyWay, { SOL_RADIUS, SOL_DISTANCE_LY, locateSol, createEffects });

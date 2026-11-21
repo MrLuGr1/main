@@ -85,7 +85,27 @@
   function resize() {
     width = Math.max(1, canvas.clientWidth);
     height = Math.max(1, canvas.clientHeight);
-    const nextScale = Math.min(width * 0.405, height * 0.435);
+    // Bound raster work even on high-DPI and ultrawide displays.
+    rasterScale = Math.min(2 / 3, 960 / width, 640 / height);
+    rasterWidth = Math.max(1, Math.round(width * rasterScale));
+    rasterHeight = Math.max(1, Math.round(height * rasterScale));
+    engine.resize(rasterWidth, rasterHeight);
+    hud.resize(width, height);
+    frameScene();
+    dirty = true;
+  }
+
+  function frameScene() {
+    let nextScale = Math.min(width * 0.405, height * 0.435);
+    sceneY = 0;
+    if (showHud && width <= 540) {
+      const bottom = telemetry.offsetTop - 12;
+      const top = Math.min(bottom - 1, help.offsetTop + help.offsetHeight + 10);
+      const available = bottom - top;
+      sceneY = Math.round((top + bottom - height) / 2);
+      // Keep the bright disk in the gap even if the outer survey ring extends beyond it.
+      nextScale = Math.min(nextScale, available * 0.82);
+    }
     const ratio = nextScale / (baseScale || nextScale);
     camera.x *= ratio;
     camera.y *= ratio;
@@ -94,20 +114,6 @@
     warpStart.x *= ratio;
     warpStart.y *= ratio;
     baseScale = nextScale;
-    // Bound raster work even on high-DPI and ultrawide displays.
-    rasterScale = Math.min(2 / 3, 960 / width, 640 / height);
-    rasterWidth = Math.max(1, Math.round(width * rasterScale));
-    rasterHeight = Math.max(1, Math.round(height * rasterScale));
-    engine.resize(rasterWidth, rasterHeight);
-    hud.resize(width, height);
-    updateSceneCenter();
-    dirty = true;
-  }
-
-  function updateSceneCenter() {
-    // In portrait layouts, frame the galaxy in the space above the controls.
-    sceneY = showHud && width <= 540 && height >= 560
-      ? Math.round((telemetry.offsetTop + 92 - height) / 2) : 0;
   }
 
   function refreshReadouts() {
@@ -138,7 +144,7 @@
     showHud = !showHud;
     if (!showHud && telemetry.contains(document.activeElement)) hudToggle.focus();
     telemetry.hidden = identity.hidden = survey.hidden = help.hidden = !showHud;
-    updateSceneCenter();
+    frameScene();
     hudToggle.setAttribute('aria-pressed', String(showHud));
     if (showHud) refreshReadouts();
     dirty = true;
@@ -146,8 +152,7 @@
 
   function updateViewButtons() {
     for (const button of viewButtons) {
-      const active = button.dataset.view === 'sol' ? showSol : button.dataset.view === viewpoint;
-      button.setAttribute('aria-pressed', String(active));
+      button.setAttribute('aria-pressed', String(button.dataset.view === viewpoint));
     }
   }
 
@@ -398,10 +403,9 @@
     button.addEventListener('click', () => {
       const next = button.dataset.view;
       if (next === 'sol') {
-        showSol = !showSol;
+        showSol = viewpoint !== 'sol';
         if (!showSol) {
-          if (viewpoint === 'sol') releaseView();
-          updateViewButtons();
+          releaseView();
           dirty = true;
           return;
         }
