@@ -1,7 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
 import { DicePhysics, BOARD_SCALE, keptPosition } from './physics.js?v=20261108-5';
-import { findScoringOptions, scoreSelection } from './scoring.js?v=20261109-1';
-import { chooseBotMove, makePlayers } from './bot.js';
+import { findScoringOptions, scoreSelection } from './scoring.js?v=20261122-1';
+import { chooseBotMove, makePlayers } from './bot.js?v=20261122-1';
 import { ParticleEffects, ScoringFlames, AmbientPixels } from './effects.js?v=20261108-9';
 
 const canvas = document.querySelector('#dice-table');
@@ -462,7 +462,7 @@ function hotDice(){
   showToast('HOT DICE! All six are back.');
   setMessage('HOT DICE! All six dice are back in your hand.', 'hot');
   updateTurnUI();
-  later(820,rollHand);
+  if(!currentPlayer()?.isHuman)later(820,rollHand);
 }
 
 function handleFarkle(){
@@ -605,4 +605,3 @@ let perfWindowStart=performance.now();
 let perfFrames=0;
 animationFrame=requestAnimationFrame(frame);
 showLobby('new');
-

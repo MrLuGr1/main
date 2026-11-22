@@ -1,4 +1,4 @@
-import { findScoringOptions } from './scoring.js';
+import { findScoringOptions } from './scoring.js?v=20261122-1';
 
 const BOT_NAMES = ['Moss', 'Rivet', 'Nova'];
 const BOT_COLORS = ['#c30000', '#b0aea8', '#ffffff'];
@@ -27,4 +27,3 @@ export function chooseBotMove(faces, turnPoints, bankedPoints, target = 10000) {
   const shouldBank = projected >= target || turnPoints + selection.points >= 850 || remaining <= 1;
   return { farkle: false, selection, shouldBank, remaining };
 }
-

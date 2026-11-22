@@ -1,6 +1,11 @@
 // Pure scoring rules. Keeping this module free of UI and physics makes it reusable for bots or a future server.
 const TRIPLET_BASE = { 1: 1000, 2: 200, 3: 300, 4: 400, 5: 500, 6: 600 };
 const KIND_MULTIPLIER = { 3: 1, 4: 2, 5: 4, 6: 8 };
+const SINGLE_POINTS = { 1: 100, 5: 50 };
+const FIVE_DIE_STRAIGHTS = [
+  { faces: [1, 2, 3, 4, 5], points: 750, label: 'Straight 1–5' },
+  { faces: [2, 3, 4, 5, 6], points: 1000, label: 'Straight 2–6' },
+];
 
 /** Evaluate a complete selection. A selection is valid only when every selected die scores. */
 export function scoreSelection(faces) {
@@ -15,32 +20,17 @@ export function scoreSelection(faces) {
   if (faces.length === 6 && counts.slice(1).filter(count => count === 2).length === 3) {
     return { valid: true, points: 1500, label: 'Three pairs', used: faces.length };
   }
-  if (faces.length === 5 && [1, 2].includes(Math.min(...faces)) && distinct === 5) {
-    if ([1, 2, 3, 4, 5].every(face => counts[face] === 1)) return { valid: true, points: 750, label: 'Straight 1–5', used: faces.length };
-    if ([2, 3, 4, 5, 6].every(face => counts[face] === 1)) return { valid: true, points: 1000, label: 'Straight 2–6', used: faces.length };
-  }
-  // A five-die straight can score together with a remaining single 1 or 5.
-  if (faces.length === 6) {
-    const straights = [
-      { faces: [1, 2, 3, 4, 5], points: 750, label: 'Straight 1–5' },
-      { faces: [2, 3, 4, 5, 6], points: 1000, label: 'Straight 2–6' },
-    ];
-    for (const straight of straights) {
+  if (faces.length === 5 || faces.length === 6) {
+    for (const straight of FIVE_DIE_STRAIGHTS) {
       if (!straight.faces.every(face => counts[face] > 0)) continue;
-      let extraFace = 0;
-      for (let face = 1; face <= 6; face++) {
-        const remaining = counts[face] - Number(straight.faces.includes(face));
-        if (remaining > 0) extraFace = face;
+      if (faces.length === 5) {
+        return { valid: true, points: straight.points, label: straight.label, used: 5 };
       }
-      if (extraFace === 1 || extraFace === 5) {
-        const extraPoints = extraFace === 1 ? 100 : 50;
-        return {
-          valid: true,
-          points: straight.points + extraPoints,
-          label: `${straight.label} + ${extraFace}`,
-          used: faces.length,
-        };
-      }
+      // The six-die straight already returned, so the extra die repeats a face.
+      const extraFace = faces.find(face => counts[face] === 2);
+      const extraPoints = SINGLE_POINTS[extraFace];
+      if (!extraPoints) continue;
+      return { valid: true, points: straight.points + extraPoints, label: `${straight.label} + ${extraFace}`, used: 6 };
     }
   }
 
@@ -54,10 +44,10 @@ export function scoreSelection(faces) {
       points += value;
       used += count;
       groups.push(`${count}× ${face}s (${value})`);
-    } else if (face === 1 && count > 0) {
-      points += count * 100; used += count; groups.push(`${count}× 1`);
-    } else if (face === 5 && count > 0) {
-      points += count * 50; used += count; groups.push(`${count}× 5`);
+    } else if (SINGLE_POINTS[face] && count > 0) {
+      points += count * SINGLE_POINTS[face];
+      used += count;
+      groups.push(`${count}× ${face}`);
     }
   }
   const valid = points > 0 && used === faces.length;
@@ -88,4 +78,3 @@ export function findScoringOptions(dice) {
 export function hasScoringOption(dice) {
   return findScoringOptions(dice).length > 0;
 }
-
